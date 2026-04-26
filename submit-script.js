@@ -377,43 +377,53 @@ function switchTab(tabName) {
   if (typeof lucide !== "undefined") lucide.createIcons();
 }
 
+// ========================================================
+// 🌟 2. ระบบนำทาง (Router) - แก้ไขยุบรวม switchTab()
+// ========================================================
 function switchTab(tab) {
-  // แผนผังตรวจสอบสถานะเปิด-ปิด
+  // 1. ตรวจสอบสถานะเปิด-ปิดระบบจากหลังบ้าน
   const accessMap = {
     submit: "toggle_assignment",
     halloffame: "toggle_assignment",
     shop: "toggle_gacha",
     treasure: "toggle_treasure",
     "logo-shop": "toggle_gacha",
-    mood: "toggle_news", // หรือตามที่คุณครูตั้งค่า
+    mood: "toggle_news",
+    "2dgame": "toggle_2dgame"
   };
 
-  // ถ้ามีการตั้งค่าปิดระบบไว้ ให้เด้ง Popup แจ้งเตือน
   const toggleKey = accessMap[tab];
-  if (toggleKey && currentSystemSettings[toggleKey] === false) {
+  if (toggleKey && currentSystemSettings && currentSystemSettings[toggleKey] === false) {
     showDisabledModal();
-    return; // หยุดการสลับหน้า
+    return;
   }
 
-  // --- โค้ดสลับหน้าเดิมของคุณครู ---
-  document.getElementById("panel-home").classList.add("hidden");
-  document.getElementById("btn-back-home").classList.remove("hidden");
-  [
-    "submit",
-    "halloffame",
-    "attendance",
-    "mood",
-    "shop",
-    "logo-shop",
-    "treasure",
-  ].forEach((t) => {
-    const p = document.getElementById(`panel-${t}`);
-    if (p) p.classList.add("hidden");
+  // 2. ซ่อนทุก Panel ก่อน
+  const allPanels = [
+    "home", "submit", "halloffame", "attendance", 
+    "mood", "shop", "treasure", "logo-shop", "live-class"
+  ];
+  
+  allPanels.forEach((id) => {
+    const el = document.getElementById(`panel-${id}`);
+    if (el) el.classList.add("hidden");
   });
 
+  // 3. แสดงเฉพาะ Panel ที่เลือก
   const targetPanel = document.getElementById(`panel-${tab}`);
-  if (targetPanel) targetPanel.classList.remove("hidden");
+  if (targetPanel) {
+    targetPanel.classList.remove("hidden");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
+  // 4. จัดการปุ่มย้อนกลับ (Back Button)
+  const backBtn = document.getElementById("btn-back-home");
+  if (backBtn) {
+    if (tab === "home") backBtn.classList.add("hidden");
+    else backBtn.classList.remove("hidden");
+  }
+
+  // 5. อัปเดต Title
   const titles = {
     submit: "ส่งงาน / การบ้าน",
     halloffame: "ลานเกียรติยศ",
@@ -421,15 +431,17 @@ function switchTab(tab) {
     shop: "ร้านค้าห้องเรียน",
     "logo-shop": "ตลาดนัด Logo",
     treasure: "ล่าสมบัติระดับตำนาน",
+    "live-class": "Live Classroom"
   };
-  document.getElementById("page-title").textContent =
-    titles[tab] || "Student Portal";
+  const titleEl = document.getElementById("page-title");
+  if(titleEl) titleEl.textContent = titles[tab] || "Student Portal";
 
+  // 6. การทำงานเฉพาะของแต่ละ Tab
   if (tab === "submit") switchSubTab("form");
   if (tab === "halloffame") renderHallOfFame();
-  if (tab === "logo-shop") {
-    if (typeof switchAuctionTab === "function") switchAuctionTab("market");
-  }
+  if (tab === "logo-shop" && typeof switchAuctionTab === "function") switchAuctionTab("market");
+
+  if (typeof lucide !== "undefined") lucide.createIcons();
 }
 
 // เพิ่มฟังก์ชันแสดง/ปิด Modal ระบบปิดใช้งาน
@@ -483,18 +495,16 @@ async function verifyTeacherPassword(e) {
 
   try {
     const doc = await db.collection("settings").doc("system").get();
-    let realPassword = "beer";
-    if (doc.exists && doc.data().adminPassword) {
-      realPassword = doc.data().adminPassword;
+    if (!doc.exists || !doc.data().adminPassword) {
+      showToast("ระบบยังไม่ได้ตั้งรหัสผ่านผู้ดูแล โปรดตั้งค่าในฐานข้อมูล", "error");
+      return;
     }
+
+    const realPassword = doc.data().adminPassword;
 
     if (pwd === realPassword) {
       showToast("รหัสผ่านถูกต้อง...", "success");
-
-      // 🟢 อัปเกรดความปลอดภัย: ใช้ sessionStorage และรองรับรหัสผ่านภาษาไทย
-      const secureToken = "secured_" + encodeURIComponent(pwd);
       sessionStorage.setItem("teacher_secure_access", "secured_" + encodeURIComponent(pwd));
-
       setTimeout(() => {
         window.location.href = "teacher.html";
       }, 1000);
@@ -505,6 +515,60 @@ async function verifyTeacherPassword(e) {
   } catch (err) {
     showToast("ตรวจสอบรหัสไม่สำเร็จ ลองใหม่อีกครั้ง", "error");
   }
+}
+
+async function verifyLiveTeacher(e) {
+  e.preventDefault();
+  const pwd = document.getElementById('live-teacher-pwd').value;
+  
+  try {
+    const doc = await db.collection("settings").doc("system").get();
+    if (!doc.exists || !doc.data().adminPassword) {
+      return showToast("ไม่พบรหัสผ่านผู้ดูแลในระบบ", "error");
+    }
+
+    const realPassword = doc.data().adminPassword;
+
+    if (pwd === realPassword) { 
+        isLiveTeacher = true;
+        closeTeacherLogin();
+        
+        const teacherRef = firebase.database().ref(`live_classrooms/${currentLiveRoomId}/teacher`);
+        teacherRef.onDisconnect().remove(); 
+        
+        teacherRef.set({
+            online: true,
+            name: loggedInUser.name,
+            avatar: loggedInUser.profile_url || `https://ui-avatars.com/api/?name=Teacher&background=f59e0b`,
+            last_active: Date.now()
+        });
+
+        document.getElementById('live-teacher-controls').classList.remove('hidden');
+        showToast("เข้าสู่โหมดครูผู้สอนเรียบร้อย!", "success");
+    } else {
+        showToast("รหัสผ่านไม่ถูกต้อง!", "error");
+        document.getElementById('live-teacher-pwd').value = "";
+    }
+  } catch(err) {
+      showToast("ตรวจสอบรหัสผ่านไม่สำเร็จ", "error");
+  }
+}
+
+function leaveLiveClass() {
+    if (isLiveTeacher) {
+        firebase.database().ref(`live_classrooms/${currentLiveRoomId}/teacher`).remove();
+        isLiveTeacher = false; // ป้องกันสถานะ True ค้างเมื่อเข้าห้องใหม่
+    }
+
+    const mySeatRef = firebase.database().ref(`live_classrooms/${currentLiveRoomId}/seats/${loggedInUser.id}`);
+    mySeatRef.remove();
+    
+    firebase.database().ref(`live_classrooms/${currentLiveRoomId}/seats`).off();
+    firebase.database().ref(`live_classrooms/${currentLiveRoomId}/teacher`).off();
+    firebase.database().ref(`live_classrooms/${currentLiveRoomId}/status`).off();
+    
+    document.getElementById("panel-live-class").classList.add("hidden");
+    goToHome();
 }
 
 function showToast(msg, type = "success") {
@@ -2886,38 +2950,7 @@ async function loadUserAvatarWithTitle() {
     applyAvatarStyles(shortName, avatarUrl, rarity);
 }
 
-// ฟังก์ชันช่วยวาดสไตล์ (วางไว้ล่างสุดของไฟล์)
-function applyAvatarStyles(shortName, avatarUrl, rarity) {
-  const greetingEl = document.getElementById("user-greeting");
-  const avatarEl = document.getElementById("main-profile-avatar");
-  let frameCSS = "bg-slate-200",
-    nameCSS = "text-slate-800";
 
-  if (rarity === "legendary") {
-    frameCSS =
-      "bg-gradient-to-b from-yellow-300 via-amber-500 to-yellow-600 p-[4px] shadow-[0_0_20px_rgba(251,191,36,0.8)] ring-2 ring-yellow-200 ring-offset-1 animate-pulse";
-    nameCSS =
-      "text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500 drop-shadow-sm";
-  } else if (rarity === "epic") {
-    frameCSS =
-      "bg-gradient-to-r from-fuchsia-500 via-purple-500 to-cyan-500 p-[3px] shadow-[0_0_15px_rgba(168,85,247,0.6)]";
-    nameCSS =
-      "text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-500 to-purple-500";
-  } else if (rarity === "rare") {
-    frameCSS = "bg-cyan-400 p-[3px] shadow-[0_0_10px_rgba(34,211,238,0.6)]";
-    nameCSS = "text-cyan-600";
-  }
-
-  if (greetingEl) {
-    greetingEl.className = `text-2xl font-bold transition-all duration-300 ${nameCSS}`;
-    greetingEl.innerHTML = `Hi, ${shortName}! 👋`;
-  }
-  if (avatarEl) {
-    // 🌟 ปรับขนาดรูปโปรไฟล์ให้ใหญ่ขึ้น (เป้าหมาย 250px) และยืดหยุ่นตามหน้าจอ
-    avatarEl.className = `relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-[250px] lg:h-[250px] shrink-0 rounded-full flex items-center justify-center transition-all duration-500 shadow-xl ${frameCSS}`;
-    avatarEl.innerHTML = `<img src="${avatarUrl}" class="w-full h-full object-cover rounded-full border-2 border-white/90 shadow-sm">`;
-  }
-}
 
 // 🚨 วาง Web App URL ที่ได้จาก Google Apps Script (อันเดียวกับข้างบน) ตรงนี้ครับ
 const TREASURE_GAS_URL =
@@ -4570,4 +4603,405 @@ function equipItem(type, value, skipAnimation = false) {
             setTimeout(() => slot.classList.remove('ring-4', 'ring-indigo-400', 'scale-110', 'border-transparent'), 300);
         }
     }
+}
+
+
+// =================================================================
+// 🏫 ระบบ LIVE CLASSROOM (Gamified Attendance)
+// =================================================================
+const TOTAL_DESKS = 30; // จำนวนโต๊ะทั้งหมดในห้อง
+let currentLiveRoomId = "CLASS_01"; // ตั้งเป็นค่าเริ่มต้น หรือดึงจากห้องเรียนเด็ก
+let liveClassListener = null;
+let amISitting = false;
+
+// 1. ฟังก์ชันเปิดหน้าห้องเรียน และเริ่มดักฟังข้อมูล
+function openLiveClassroom() {
+    if (!loggedInUser || !loggedInUser.id) {
+        return showToast("กรุณาเข้าสู่ระบบก่อนเข้าห้องเรียนครับ", "error");
+    }
+
+    switchTab('live-class'); 
+    const classPanel = document.getElementById("panel-live-class");
+    classPanel.classList.remove("hidden");
+    
+    // 🌟 [ส่วนที่เพิ่มใหม่] สั่งให้เลื่อนหน้าจอไปที่จุดบนสุดของห้องเรียนแบบนุ่มนวล
+    setTimeout(() => {
+        classPanel.scrollIntoView({ 
+            behavior: 'smooth', // เลื่อนแบบสมูท
+            block: 'start'      // ให้ขอบบนของห้องเรียนอยู่ชิดขอบจอบนพอดี
+        });
+    }, 100); // ใส่ดีเลย์ 0.1 วินาที ให้เบราว์เซอร์วาดกล่องเสร็จก่อนค่อยเลื่อน
+    
+    const studentInfo = teacherDbStudents.find(s => String(s.student_id) === String(loggedInUser.id));
+    if (studentInfo && studentInfo.classroom) {
+        const safeRoomName = studentInfo.classroom.replace(/[\/\.]/g, "_");
+        currentLiveRoomId = "CLASS_" + safeRoomName; 
+        document.getElementById("live-class-title").textContent = `ห้องเรียน ${studentInfo.classroom}`;
+    }
+
+    startListeningToDesks();
+    startListeningToStatus(); 
+}
+
+
+// 2. ดักฟัง RTDB วาดโต๊ะเรียลไทม์
+function startListeningToDesks() {
+    const roomRef = firebase.database().ref(`live_classrooms/${currentLiveRoomId}/seats`);
+    const teacherRef = firebase.database().ref(`live_classrooms/${currentLiveRoomId}/teacher`);
+    
+    // ดักฟังสถานะครู
+    teacherRef.on("value", (snapshot) => {
+        const data = snapshot.val();
+        const avatarImg = document.getElementById("live-teacher-avatar");
+        const container = document.getElementById("live-teacher-avatar-container");
+        const subtitle = document.getElementById("live-class-subtitle");
+        const nameTag = document.getElementById("live-teacher-name"); // ตัวแปรสำหรับป้ายชื่อ
+
+        if (data && data.online) {
+            avatarImg.src = data.avatar;
+            container.classList.add("ring-4", "ring-amber-400", "animate-pulse"); 
+            subtitle.innerHTML = `<span class="text-white bg-emerald-500 px-2 py-0.5 rounded-full animate-bounce inline-block mr-1">●</span> ครูประจำวิชาออนไลน์อยู่`;
+            
+            // อัปเดตชื่อครูบนแท่น
+            if (nameTag) {
+                const shortName = data.name.split(" ")[0]; // เอาแค่ชื่อหน้า
+                nameTag.textContent = `ครู${shortName}`; 
+                nameTag.classList.remove("bg-amber-500");
+                nameTag.classList.add("bg-emerald-500"); // เปลี่ยนสีป้ายให้ดู Active สีเขียว
+            }
+        } else {
+            avatarImg.src = "https://ui-avatars.com/api/?name=Teacher&background=f59e0b&color=fff";
+            container.classList.remove("ring-4", "ring-amber-400", "animate-pulse");
+            subtitle.textContent = "คุณครูกำลังรออยู่ เลือกที่นั่งได้เลย!";
+            
+            // คืนค่าป้ายชื่อกลับเป็นสถานะรอ
+            if (nameTag) {
+                nameTag.textContent = "ครูผู้สอน";
+                nameTag.classList.remove("bg-emerald-500");
+                nameTag.classList.add("bg-amber-500");
+            }
+        }
+    });
+
+    // ดักฟังที่นั่งเด็ก (โค้ดเดิม)
+    roomRef.on("value", (snapshot) => {
+        const seatsData = snapshot.val() || {};
+        renderDesks(seatsData);
+    });
+}
+// 3. วาดโต๊ะ 30 ตัว
+function renderDesks(seatsData) {
+    const container = document.getElementById("live-desks-container");
+    let html = "";
+    let occupiedCount = 0;
+    amISitting = false;
+
+    // หาว่าเรานั่งอยู่ช่องไหน
+    for (const key in seatsData) {
+        if (seatsData[key].student_id === String(loggedInUser.id)) {
+            amISitting = true;
+        }
+    }
+
+    for (let i = 1; i <= TOTAL_DESKS; i++) {
+        // หาว่าโต๊ะเบอร์นี้มีคนนั่งไหม
+        let occupant = null;
+        for (const key in seatsData) {
+            if (seatsData[key].seat_index === i) {
+                occupant = seatsData[key];
+                occupiedCount++;
+                break;
+            }
+        }
+
+        if (occupant) {
+            // โต๊ะมีคนนั่ง
+            const isMe = occupant.student_id === String(loggedInUser.id);
+            const myBorder = isMe ? "border-emerald-400 ring-4 ring-emerald-200" : "border-white";
+            
+            html += `
+                <div class="desk-25d relative z-0">
+                    <img src="${occupant.avatar}" class="avatar-sit ${myBorder}">
+                    <div class="student-name-tag ${isMe ? 'text-emerald-600' : ''}">${occupant.name}</div>
+                </div>
+            `;
+        } else {
+            // โต๊ะว่าง
+            html += `
+                <div class="desk-25d relative z-0">
+                    <div onclick="claimSeat(${i})" class="seat-empty" title="จองที่นั่งนี้">?</div>
+                </div>
+            `;
+        }
+    }
+
+    container.innerHTML = html;
+    document.getElementById("live-seat-count").textContent = occupiedCount;
+}
+
+// 4. ฟังก์ชันกดจองที่นั่ง
+async function claimSeat(seatIndex) {
+    if (amISitting) {
+        return showToast("คุณนั่งโต๊ะอื่นไปแล้วจ้า! ลุกก่อนถึงจะย้ายได้", "error");
+    }
+
+    const studentInfo = teacherDbStudents.find(s => String(s.student_id) === String(loggedInUser.id));
+    const shortName = loggedInUser.name.split(" ")[0];
+    const avatarUrl = studentInfo?.profile_url || `https://ui-avatars.com/api/?name=${shortName}&background=random`;
+
+    const mySeatRef = firebase.database().ref(`live_classrooms/${currentLiveRoomId}/seats/${loggedInUser.id}`);
+    
+    // ตั้งค่าให้ลบตัวเองออกอัตโนมัติเมื่อปิดแท็บ (กันผี)
+    mySeatRef.onDisconnect().remove();
+
+    await mySeatRef.set({
+        student_id: String(loggedInUser.id),
+        name: shortName,
+        avatar: avatarUrl,
+        seat_index: seatIndex,
+        timestamp: Date.now()
+    });
+
+    showToast("ได้ที่นั่งแล้ว! 🎉", "success");
+}
+
+// 5. ลุกออกจากโต๊ะ / ออกจากห้อง
+function leaveLiveClass() {
+    // ถ้าคนกดออกคือครู ให้ลบสถานะครูด้วย
+    if (isLiveTeacher) {
+        firebase.database().ref(`live_classrooms/${currentLiveRoomId}/teacher`).remove();
+        isLiveTeacher = false;
+    }
+
+    const mySeatRef = firebase.database().ref(`live_classrooms/${currentLiveRoomId}/seats/${loggedInUser.id}`);
+    mySeatRef.remove();
+    
+    // ปิดการดักฟัง
+    firebase.database().ref(`live_classrooms/${currentLiveRoomId}/seats`).off();
+    firebase.database().ref(`live_classrooms/${currentLiveRoomId}/teacher`).off();
+    firebase.database().ref(`live_classrooms/${currentLiveRoomId}/status`).off();
+    
+    document.getElementById("panel-live-class").classList.add("hidden");
+    goToHome();
+}
+
+// =================================================================
+// 👨‍🏫 ระบบควบคุมของครู (Teacher Live Control)
+// =================================================================
+let isLiveTeacher = false;
+
+// 1. เปิดหน้าต่างใส่รหัส
+function openTeacherLogin() {
+    if (isLiveTeacher) {
+        // ถ้าล็อกอินแล้ว กดอีกทีจะเป็นการซ่อน/โชว์แผงควบคุม
+        document.getElementById('live-teacher-controls').classList.toggle('hidden');
+        return;
+    }
+    const modal = document.getElementById('live-teacher-modal');
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.classList.add('active'), 10);
+    document.getElementById('live-teacher-pwd').value = "";
+    document.getElementById('live-teacher-pwd').focus();
+}
+
+function closeTeacherLogin() {
+    const modal = document.getElementById('live-teacher-modal');
+    modal.classList.remove('active');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+// 2. ตรวจสอบรหัสผ่าน
+// 2. ตรวจสอบรหัสผ่าน
+function verifyLiveTeacher(e) {
+    e.preventDefault();
+    const pwd = document.getElementById('live-teacher-pwd').value;
+    
+    if (btoa(pwd) === 'YmVlcg==') { // รหัส beer
+        isLiveTeacher = true;
+        closeTeacherLogin();
+        
+        // ค้นหารูปโปรไฟล์ของคนที่ล็อกอินอยู่
+        const userInfo = teacherDbStudents.find(s => String(s.student_id) === String(loggedInUser.id));
+        let myAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(loggedInUser.name)}&background=f59e0b&color=fff`;
+        if (userInfo && (userInfo.profile_url || userInfo.avatar_url || userInfo.url)) {
+             myAvatar = userInfo.profile_url || userInfo.avatar_url || userInfo.url;
+        }
+
+        // 🚩 ส่งสถานะครูออนไลน์ไปที่ RTDB พร้อมรูปจริงและชื่อจริง
+        const teacherRef = firebase.database().ref(`live_classrooms/${currentLiveRoomId}/teacher`);
+        teacherRef.onDisconnect().remove(); 
+        
+        teacherRef.set({
+            online: true,
+            name: loggedInUser.name,
+            avatar: myAvatar, // ใช้รูปจริงของครูที่ดึงมา
+            last_active: Date.now()
+        });
+
+        document.getElementById('live-teacher-controls').classList.remove('hidden');
+        showToast("เข้าสู่โหมดครูผู้สอนเรียบร้อย!", "success");
+    } else {
+        showToast("รหัสผ่านไม่ถูกต้อง!", "error");
+    }
+}
+
+// 3. ฟังก์ชันกวาดเด็กเข้า Database
+async function teacherSaveLiveAttendance() {
+    const period = document.getElementById('live-class-period').value;
+    if (!period) return showToast("กรุณาเลือกคาบเรียนก่อนกดเช็คชื่อครับ", "error");
+
+    const btn = document.getElementById('btn-teacher-save-att');
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> บันทึก...';
+    lucide.createIcons();
+
+    try {
+        // 1. ดึงข้อมูลนักเรียนที่กำลังนั่งโต๊ะอยู่ "ณ เสี้ยววินาทีนี้" จาก RTDB
+        const snapshot = await firebase.database().ref(`live_classrooms/${currentLiveRoomId}/seats`).once('value');
+        const seatsData = snapshot.val() || {};
+        const seatedStudents = Object.values(seatsData);
+
+        if (seatedStudents.length === 0) {
+            throw new Error("ยังไม่มีนักเรียนนั่งที่โต๊ะเลยครับ");
+        }
+
+        // 2. ตั้งค่าเวลาและวันที่ให้ตรงกับระบบหลัก (ดึง Date ของวันนี้)
+        const now = new Date();
+        const todayISO = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+
+        let savedCount = 0;
+        let duplicateCount = 0;
+
+        // 3. วนลูปเช็คชื่อเด็กทีละคน
+        for (const student of seatedStudents) {
+            // หาข้อมูลห้องจากฐานข้อมูลหลัก
+            const stuInfo = teacherDbStudents.find(s => String(s.student_id) === String(student.student_id));
+            const roomId = stuInfo ? stuInfo.classroom : "ไม่ระบุ";
+
+            // ตรวจสอบว่าเด็กคนนี้ถูกเช็คชื่อใน "วันที่" และ "คาบ" นี้ไปแล้วหรือยัง (ป้องกันเบิ้ล)
+            const checkSnap = await db.collection("att_records")
+                .where("student_id", "==", String(student.student_id))
+                .where("date", "==", todayISO)
+                .where("period", "==", String(period))
+                .get();
+
+            if (checkSnap.empty) {
+                // ถ้ายังไม่เช็ค ให้บันทึกลง Firestore
+                await db.collection("att_records").add({
+                    room_id: roomId,
+                    student_id: String(student.student_id),
+                    date: todayISO,
+                    period: String(period),
+                    status: "present",
+                    remark: "✅ เช็คชื่อโดยครู (Live Class)", // หมายเหตุชัดเจนว่าครูเป็นคนกดให้
+                    timestamp: new Date().toISOString()
+                });
+                savedCount++;
+            } else {
+                duplicateCount++; // นับยอดคนซ้ำ
+            }
+        }
+
+        // 4. รายงานผล
+        if (savedCount > 0) {
+            showToast(`แชะ! บันทึกสำเร็จ ${savedCount} คน (ข้ามคนซ้ำ ${duplicateCount} คน)`, "success");
+            // จุดพลุฉลองให้นักเรียนในห้องทุกคนตกใจ
+            confetti({ particleCount: 150, spread: 100, origin: { y: 0.3 }, colors: ['#10b981', '#f59e0b', '#3b82f6'] });
+            // 🚩 ส่วนที่เพิ่มใหม่: ส่งสัญญาณ Kick ไปที่ RTDB
+            firebase.database().ref(`live_classrooms/${currentLiveRoomId}/status`).set({
+                action: "kick",
+                timestamp: Date.now()
+            });
+          } else {
+            showToast(`นักเรียนที่นั่งอยู่ (${duplicateCount} คน) ถูกเช็คชื่อคาบนี้ไปหมดแล้วครับ`, "info");
+        }
+
+    } catch (e) {
+        showToast(e.message || "เกิดข้อผิดพลาดในการบันทึก", "error");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="camera" class="w-4 h-4"></i> แชะ! เช็คชื่อ';
+        lucide.createIcons();
+    }
+}
+
+
+// ฟังก์ชันดักฟังคำสั่งจากครู (วางไว้ต่อจาก startListeningToDesks)
+function startListeningToStatus() {
+    const statusRef = firebase.database().ref(`live_classrooms/${currentLiveRoomId}/status`);
+    
+    statusRef.on("value", (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.action === "kick") {
+            // ป้องกันการทำงานซ้ำ ถ้าเพิ่ง Kick ไปไม่เกิน 10 วินาที
+            if (Date.now() - data.timestamp < 10000) {
+                runKickCountdown();
+            }
+        }
+    });
+}
+
+// ฟังก์ชันนับถอยหลังและเตะออก
+function runKickCountdown() {
+    const overlay = document.getElementById('kick-overlay');
+    const numDisplay = document.getElementById('kick-number');
+    overlay.classList.remove('hidden');
+    
+    let count = 3;
+    numDisplay.textContent = count;
+
+    const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+            numDisplay.textContent = count;
+            // ใส่เสียงคลิกสั้นๆ หรือเล่นแอนิเมชันเพิ่มได้ที่นี่
+        } else {
+            clearInterval(interval);
+            numDisplay.textContent = "GO!";
+            
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                leaveLiveClass(); // ฟังก์ชันเดิมที่เราทำไว้ (ลุกจากที่นั่ง + กลับหน้าแรก)
+                
+                // ล้างสถานะใน DB (เฉพาะครูเป็นคนล้าง หรือจะปล่อยให้มันค้างไว้ก็ได้)
+                if(isLiveTeacher) {
+                    firebase.database().ref(`live_classrooms/${currentLiveRoomId}/status`).remove();
+                }
+            }, 500);
+        }
+    }, 1000);
+}
+
+// ========================================================
+// 🌟 Daily Quest Status Checker (Fallback)
+// ========================================================
+window.checkDailyQuestStatus = function(studentId) {
+  // หากมีไฟล์ daily-quest.js ทำงานซ้อนอยู่ มันจะข้ามฟังก์ชันนี้ไป
+  if(document.getElementById('daily-mascot-container')) {
+     const today = new Date().toLocaleDateString("th-TH");
+     const questDone = localStorage.getItem(`quest_done_${studentId}_${today}`);
+     
+     if(!questDone) {
+         document.getElementById('daily-mascot-container').style.display = 'flex';
+     } else {
+         document.getElementById('daily-mascot-container').style.display = 'none';
+     }
+  }
+}
+
+window.openDailyQuest = function() {
+  const modal = document.getElementById('quest-modal');
+  if(modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      // Logic ของเควสต์สามารถปรับปรุงเพิ่มเติมได้ที่ daily-quest.js
+  }
+}
+
+window.closeQuestModal = function() {
+  const modal = document.getElementById('quest-modal');
+  if(modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+  }
 }

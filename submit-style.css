@@ -205,3 +205,92 @@ select option { background-color: #ffffff; color: #1e293b; }
 .news-slider-item {
     animation: newsFadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
+
+
+
+/* โต๊ะเรียน 2.5D */
+.desk-25d {
+    background: linear-gradient(145deg, #e6b981 0%, #c49a6c 100%);
+    border: 2px solid #a37c54;
+    border-bottom: 8px solid #8b6239; /* ความหนาของโต๊ะ */
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+    position: relative;
+    transition: all 0.2s ease;
+    height: 40px;
+    width: 100%;
+}
+
+.desk-25d:active {
+    border-bottom-width: 2px;
+    transform: translateY(6px);
+}
+
+/* เก้าอี้เปล่า (ให้คลิกได้) */
+.seat-empty {
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.8);
+    border: 2px dashed #a37c54;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    color: #a37c54;
+    cursor: pointer;
+    transition: all 0.2s;
+    backdrop-filter: blur(2px);
+}
+
+.seat-empty:hover {
+    background: white;
+    transform: translateX(-50%) scale(1.1);
+    border-style: solid;
+    border-color: #f59e0b;
+    color: #f59e0b;
+}
+
+/* แอนิเมชันรูปโปรไฟล์เด้งมานั่งโต๊ะ */
+@keyframes popSit {
+    0% { transform: translateX(-50%) translateY(-20px) scale(0.5); opacity: 0; }
+    50% { transform: translateX(-50%) translateY(5px) scale(1.1); opacity: 1; }
+    100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+}
+
+.avatar-sit {
+    position: absolute;
+    top: -45px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 55px;
+    height: 55px;
+    border-radius: 50%;
+    border: 3px solid white;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    object-fit: cover;
+    background: white;
+    animation: popSit 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    z-index: 10;
+}
+
+.student-name-tag {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 9px;
+    font-weight: bold;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    white-space: nowrap;
+    z-index: 15;
+}
