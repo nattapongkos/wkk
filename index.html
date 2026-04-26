@@ -6,13 +6,13 @@
     <title>Student Portal - ศูนย์รวมการเรียนรู้</title>
 
     <!-- 📱 PWA -->
-    <link rel="manifest" href="./manifest.json" />
+    <link rel="manifest" href="/wkk/manifest.json" />
     <meta name="theme-color" content="#4f46e5" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Student Portal" />
-    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/wkk/icons/icon-192.png" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
@@ -3525,11 +3525,11 @@
     <script src="daily-quest.js"></script>
     
 
-  <script>
+<script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // ใช้ Relative path (./) เพื่อให้อ้างอิงจากโฟลเดอร์ปัจจุบันเสมอ ไม่ว่าชื่อโฟลเดอร์จะเปลี่ยนเป็นอะไร
-    navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+    // ระบุ scope และ path ให้ชี้มาที่ /wkk/
+    navigator.serviceWorker.register('/wkk/service-worker.js', { scope: '/wkk/' })
       .then((reg) => {
         console.log('[PWA] Service Worker registered:', reg.scope);
 

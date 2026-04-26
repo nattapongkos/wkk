@@ -1,13 +1,13 @@
 // =====================================================
 // 🔧 Student Portal — Service Worker (PWA)
 // =====================================================
-const CACHE_NAME = "student-portal-v7";
+const CACHE_NAME = "student-portal-v8"; // เปลี่ยนเวอร์ชันเพื่อบังคับอัปเดตแคช
 
 const STATIC_ASSETS = [
-  "./index.html",
-  "./submit-script.js",
-  "./submit-style.css",
-  "./manifest.json",
+  "/wkk/index.html",
+  "/wkk/submit-script.js",
+  "/wkk/submit-style.css",
+  "/wkk/manifest.json",
   "https://cdn.tailwindcss.com",
   "https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js",
   "https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap"
@@ -80,7 +80,8 @@ self.addEventListener("fetch", (event) => {
             return cachedResponse;
           }
           if (event.request.destination === "document") {
-            return caches.match("./index.html"); 
+            // ดึง index.html จากโฟลเดอร์ /wkk/ เมื่อไม่มีอินเทอร์เน็ต
+            return caches.match("/wkk/index.html"); 
           }
           return new Response('', { status: 404, statusText: 'Not Found' });
         });
