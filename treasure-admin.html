@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="th" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Treasure Hunt Admin - จัดการภารกิจล่าสมบัติ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sarabun: ["Sarabun", "sans-serif"],
+              outfit: ["Outfit", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyAHAe6Q4TRjChkJuZ-z7ZT2N23Qm8Aun6U",
+        authDomain: "wkk69-54b7c.firebaseapp.com",
+        projectId: "wkk69-54b7c",
+        storageBucket: "wkk69-54b7c.firebasestorage.app",
+        messagingSenderId: "996097508438",
+        appId: "1:996097508438:web:5bcef61e99ed3e8ba727f7",
+      };
+      if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+    </script>
+  </head>
+  <body class="h-full bg-slate-50 font-sarabun relative overflow-x-hidden">
+    <div
+      id="toast-container"
+      class="fixed bottom-6 right-6 z-[200] flex flex-col gap-3"
+    ></div>
+
+    <header
+      class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm"
+    >
+      <div
+        class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-4">
+          <a
+            href="teacher.html"
+            class="w-10 h-10 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors flex items-center justify-center border border-slate-200"
+            ><i data-lucide="arrow-left" class="w-5 h-5"></i
+          ></a>
+          <div>
+            <h1
+              class="text-xl font-bold text-slate-800 font-outfit tracking-tight"
+            >
+              Treasure Maker
+            </h1>
+            <p
+              class="text-xs text-amber-500 font-bold uppercase tracking-widest mt-0.5"
+            >
+              สร้างลายแทงล่าสมบัติ
+            </p>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button
+            onclick="openLiveDropMap()"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-200 transition-all hover:scale-105"
+          >
+            <i data-lucide="globe" class="w-4 h-4"></i> Live Drops
+          </button>
+          <button
+            onclick="openCreateModal()"
+            class="bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white px-4 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 shadow-lg shadow-amber-200 transition-all hover:scale-105"
+          >
+            <i data-lucide="map" class="w-4 h-4"></i> สร้างภารกิจ
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-8">
+      <h2
+        class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3"
+      >
+        <i data-lucide="compass" class="w-6 h-6 text-amber-500"></i>
+        ภารกิจทั้งหมด
+      </h2>
+      <div
+        id="quest-list"
+        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+      >
+        <div class="col-span-full text-center py-10 text-slate-400">
+          <i
+            data-lucide="loader-2"
+            class="w-8 h-8 animate-spin mx-auto mb-2"
+          ></i>
+          กำลังโหลดข้อมูล...
+        </div>
+      </div>
+    </main>
+
+    <div
+      id="create-modal"
+      class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] hidden flex items-center justify-center p-4 transition-all opacity-0 duration-300"
+    >
+      <div
+        class="bg-white rounded-[2.5rem] w-full max-w-4xl shadow-[0_0_40px_rgba(245,158,11,0.2)] overflow-hidden border-2 border-amber-200/50 transform scale-95 transition-transform duration-300 flex flex-col max-h-[90vh] relative"
+      >
+        <div
+          class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 z-20"
+        ></div>
+
+        <div
+          class="p-6 border-b border-slate-100 flex justify-between items-center bg-amber-50/50 relative overflow-hidden shrink-0"
+        >
+          <div
+            class="absolute -right-10 -top-10 w-32 h-32 bg-amber-400/20 rounded-full blur-2xl pointer-events-none"
+          ></div>
+          <h3
+            id="modal-title"
+            class="text-2xl font-black text-slate-800 flex items-center gap-3 relative z-10"
+          >
+            <div
+              class="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30 text-white"
+            >
+              <i data-lucide="map-pin" class="w-6 h-6"></i>
+            </div>
+            <span>สร้างลายแทงสมบัติ</span>
+          </h3>
+          <button
+            onclick="closeCreateModal()"
+            class="w-10 h-10 flex items-center justify-center bg-white rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 hover:rotate-90 transition-all shadow-sm border border-slate-200 relative z-10"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div
+          class="p-6 md:p-8 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50"
+        >
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="space-y-5">
+              <h4
+                class="text-sm font-bold text-slate-800 flex items-center gap-2 border-b border-slate-200 pb-3"
+              >
+                <i data-lucide="info" class="w-4 h-4 text-amber-500"></i>
+                ข้อมูลลายแทงสมบัติ
+              </h4>
+
+              <div class="space-y-1.5">
+                <label
+                  class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1"
+                  >ชื่อลายแทงสมบัติ <span class="text-rose-500">*</span></label
+                >
+                <input
+                  type="text"
+                  id="quest-title"
+                  class="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-800 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all shadow-sm"
+                  placeholder="เช่น ดาบผู้กล้าแห่งจันจว้า"
+                />
+              </div>
+
+              <div class="space-y-1.5">
+                <label
+                  class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1"
+                  >คำใบ้ / เนื้อเรื่องย่อ</label
+                >
+                <textarea
+                  id="quest-desc"
+                  rows="3"
+                  class="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm text-slate-600 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all shadow-sm resize-none"
+                  placeholder="บอกใบ้สถานที่ซ่อน หรือแต่งเนื้อเรื่องให้น่าติดตาม..."
+                ></textarea>
+              </div>
+
+              <div class="space-y-1.5">
+                <label
+                  class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1"
+                  >ลิงก์ภาพหน้าปก (Cover URL)</label
+                >
+                <div class="relative group">
+                  <i
+                    data-lucide="image"
+                    class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-amber-500 transition-colors"
+                  ></i>
+                  <input
+                    type="url"
+                    id="quest-cover"
+                    oninput="previewCover(this.value)"
+                    class="w-full bg-white border border-slate-200 rounded-2xl pl-11 pr-4 py-4 text-sm text-slate-600 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all shadow-sm"
+                    placeholder="https://ลิงก์รูปภาพ..."
+                  />
+                </div>
+                <div
+                  id="cover-preview-container"
+                  class="hidden mt-3 rounded-2xl overflow-hidden h-40 border-2 border-dashed border-amber-300 relative bg-amber-50"
+                >
+                  <img
+                    id="cover-preview-img"
+                    src=""
+                    class="w-full h-full object-cover"
+                  />
+                  <div
+                    class="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent flex items-end p-3"
+                  >
+                    <span
+                      class="text-[10px] text-white font-bold bg-black/50 px-3 py-1.5 rounded-lg backdrop-blur-sm shadow-sm"
+                      ><i data-lucide="eye" class="w-3 h-3 inline mr-1"></i>
+                      ตัวอย่างหน้าปก</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-5">
+              <h4
+                class="text-sm font-bold text-slate-800 flex items-center gap-2 border-b border-slate-200 pb-3"
+              >
+                <i data-lucide="puzzle" class="w-4 h-4 text-indigo-500"></i>
+                ชิ้นส่วน & รูปภาพสะสม
+              </h4>
+
+              <div
+                class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-[1.5rem] p-5 shadow-sm relative overflow-hidden group"
+              >
+                <div
+                  class="absolute -right-6 -bottom-6 opacity-10 group-hover:scale-110 transition-transform duration-500"
+                >
+                  <i data-lucide="grid" class="w-32 h-32 text-indigo-500"></i>
+                </div>
+                <label
+                  class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest block mb-3 relative z-10"
+                  >กำหนดจำนวนชิ้นส่วนที่ต้องค้นหา</label
+                >
+
+                <div
+                  class="flex items-center gap-3 relative z-10 bg-white p-2 rounded-2xl shadow-sm border border-indigo-50"
+                >
+                  <button
+                    onclick="adjustPieces(-1)"
+                    class="w-12 h-12 bg-slate-50 rounded-xl text-slate-500 font-black hover:bg-rose-500 hover:text-white transition-colors flex items-center justify-center"
+                  >
+                    <i data-lucide="minus" class="w-5 h-5"></i>
+                  </button>
+                  <input
+                    type="number"
+                    id="quest-pieces"
+                    min="2"
+                    max="10"
+                    value="3"
+                    oninput="generateImageInputs()"
+                    class="flex-1 bg-transparent py-2 text-3xl font-black outline-none text-center text-indigo-600 appearance-none"
+                    style="-moz-appearance: textfield"
+                  />
+                  <button
+                    onclick="adjustPieces(1)"
+                    class="w-12 h-12 bg-slate-50 rounded-xl text-slate-500 font-black hover:bg-emerald-500 hover:text-white transition-colors flex items-center justify-center"
+                  >
+                    <i data-lucide="plus" class="w-5 h-5"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div
+                id="dynamic-image-inputs"
+                class="space-y-2.5 bg-white p-5 rounded-[1.5rem] border border-slate-200 shadow-sm max-h-[250px] overflow-y-auto custom-scrollbar"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="p-6 border-t border-slate-100 flex gap-4 bg-white shrink-0 z-10 shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.05)]"
+        >
+          <button
+            onclick="closeCreateModal()"
+            class="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-600 py-4 rounded-2xl text-sm font-bold transition-all uppercase tracking-widest"
+          >
+            ยกเลิก
+          </button>
+          <button
+            id="btn-save-quest"
+            onclick="saveQuest()"
+            class="w-2/3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white py-4 rounded-2xl text-sm font-bold shadow-lg shadow-orange-500/30 transition-all uppercase tracking-widest flex items-center justify-center gap-2 group"
+          >
+            <i
+              data-lucide="save"
+              class="w-5 h-5 group-hover:scale-110 transition-transform"
+            ></i>
+            บันทึกและสร้างลายแทง
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="delete-confirm-modal"
+      class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4 transition-all opacity-0 duration-300"
+    >
+      <div
+        class="bg-white rounded-[2.5rem] w-full max-w-sm shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300 text-center relative"
+      >
+        <div
+          class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-rose-500 to-red-600"
+        ></div>
+        <div class="p-8">
+          <div
+            class="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-6 border-8 border-white shadow-[0_0_15px_rgba(225,29,72,0.2)]"
+          >
+            <i data-lucide="alert-triangle" class="w-10 h-10 text-rose-500"></i>
+          </div>
+          <h3 class="text-2xl font-black text-slate-800 mb-2">ยืนยันการลบ?</h3>
+          <p class="text-sm text-slate-500 mb-4">
+            คุณแน่ใจหรือไม่ว่าต้องการลบภารกิจนี้
+            <br />นักเรียนที่สะสมชิ้นส่วนอยู่จะไม่สามารถทำต่อได้
+          </p>
+
+          <p
+            id="delete-target-name"
+            class="text-sm font-bold text-rose-600 bg-rose-50 py-2 px-4 rounded-xl inline-block mb-8 break-words max-w-full truncate border border-rose-100"
+          >
+            ...
+          </p>
+
+          <div class="flex gap-4">
+            <button
+              onclick="closeDeleteModal()"
+              class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 py-3.5 rounded-2xl text-sm font-bold transition-all uppercase tracking-widest"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onclick="confirmDeleteAction()"
+              id="btn-confirm-delete"
+              class="flex-1 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white py-3.5 rounded-2xl text-sm font-bold shadow-lg shadow-rose-200 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+            >
+              <i data-lucide="trash-2" class="w-4 h-4"></i> ลบภารกิจ
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="qr-modal"
+      class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4 transition-opacity opacity-0 duration-300"
+    >
+      <div
+        class="bg-white rounded-[2rem] w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
+        <div
+          class="p-6 border-b border-slate-100 flex justify-between items-center"
+        >
+          <h3 class="text-xl font-bold text-slate-800" id="qr-modal-title">
+            QR Code ลายแทง
+          </h3>
+          <button
+            onclick="closeQRModal()"
+            class="text-slate-400 hover:text-rose-500 transition-colors"
+          >
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+        <div class="p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50">
+          <div class="flex justify-between items-center mb-4">
+            <p class="text-sm text-slate-500">
+              เซฟรูปภาพด้านล่างนี้ ไปปริ้นท์แปะตามจุดต่างๆ ได้เลยครับ
+            </p>
+            <button
+              onclick="window.print()"
+              class="text-xs bg-slate-800 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-md"
+            >
+              <i data-lucide="printer" class="w-3 h-3"></i> ปริ้นท์หน้านี้
+            </button>
+          </div>
+          <div
+            id="qr-codes-container"
+            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="map-picker-modal"
+      class="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4 transition-all opacity-0 duration-300"
+    >
+      <div
+        class="bg-white rounded-[2rem] w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col h-[80vh]"
+      >
+        <div
+          class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-800 text-white"
+        >
+          <h3 class="text-lg font-bold flex items-center gap-2">
+            <i data-lucide="map-pin" class="w-5 h-5 text-amber-400"></i>
+            เลือกพิกัดซ่อนสมบัติ
+          </h3>
+          <button
+            onclick="closeMapPicker()"
+            class="text-slate-400 hover:text-rose-400 transition-colors"
+          >
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+        <div
+          class="p-2 bg-amber-50 text-amber-700 text-xs text-center font-bold"
+        >
+          เลื่อนแผนที่ให้จุดศูนย์กลางตรงกับตำแหน่งที่ต้องการ แล้วกดยืนยัน
+        </div>
+        <div class="flex-1 relative">
+          <div id="admin-map" class="w-full h-full z-0"></div>
+          <div
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[400] pointer-events-none"
+          >
+            <div
+              class="w-12 h-12 border-2 border-rose-500 rounded-full flex items-center justify-center"
+            >
+              <div class="w-2 h-2 bg-rose-500 rounded-full animate-ping"></div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="p-4 bg-white border-t border-slate-100 flex justify-between items-center z-10"
+        >
+          <div class="text-xs font-bold text-slate-500" id="map-coords-display">
+            Lat: -, Lng: -
+          </div>
+          <button
+            onclick="confirmMapLocation()"
+            class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2"
+          >
+            <i data-lucide="check" class="w-4 h-4"></i> ยืนยันพิกัดนี้
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="live-drop-modal"
+      class="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-[300] hidden flex items-center justify-center p-4 transition-all opacity-0 duration-300"
+    >
+      <div
+        class="bg-white rounded-[2rem] w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col h-[85vh] relative"
+      >
+        <div
+          class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white z-10"
+        >
+          <h3 class="text-xl font-bold flex items-center gap-2 font-outfit">
+            <i data-lucide="globe" class="w-6 h-6 text-indigo-400"></i> World
+            Map (Live Drops)
+          </h3>
+          <button
+            onclick="closeLiveDropMap()"
+            class="text-slate-400 hover:text-rose-400 transition-colors"
+          >
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+        <div
+          class="p-2 bg-indigo-50 text-indigo-700 text-xs text-center font-bold z-10"
+        >
+          คลิกที่พื้นที่บนแผนที่ เพื่อเสกกล่องสมบัติ (Loot Box)
+          ให้ไปโผล่ในมือถือของนักเรียนทันที!
+        </div>
+        <div class="flex-1 relative">
+          <div id="live-admin-map" class="w-full h-full z-0"></div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="coin-prompt-modal"
+      class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[400] hidden flex items-center justify-center p-4 transition-all opacity-0 duration-300"
+    >
+      <div
+        class="bg-white rounded-[2.5rem] w-full max-w-sm shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300 text-center relative"
+      >
+        <div
+          class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-400 to-orange-500"
+        ></div>
+        <div class="p-8">
+          <div
+            class="w-20 h-20 bg-amber-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-amber-100 shadow-[0_0_20px_rgba(245,158,11,0.2)]"
+          >
+            <i data-lucide="coins" class="w-10 h-10 text-amber-500"></i>
+          </div>
+          <h3 class="text-2xl font-black text-slate-800 mb-2 font-outfit">
+            กำหนดรางวัล
+          </h3>
+          <p class="text-sm text-slate-500 mb-6">
+            แจกเหรียญสำหรับจุดซ่อนสมบัตินี้กี่เหรียญ?
+          </p>
+
+          <div class="relative mb-8">
+            <input
+              type="number"
+              id="live-drop-coin-amount"
+              value="500"
+              min="10"
+              class="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl py-4 text-center text-3xl font-black text-amber-600 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all shadow-inner"
+            />
+          </div>
+
+          <div class="flex gap-4">
+            <button
+              onclick="closeCoinPromptModal()"
+              class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 py-3.5 rounded-2xl text-sm font-bold transition-all uppercase tracking-widest"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onclick="confirmLiveDrop()"
+              id="btn-confirm-drop"
+              class="flex-1 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white py-3.5 rounded-2xl text-sm font-bold shadow-lg shadow-orange-200 transition-all uppercase tracking-widest flex items-center justify-center gap-2 group"
+            >
+              <i
+                data-lucide="zap"
+                class="w-4 h-4 group-hover:scale-110 transition-transform"
+              ></i>
+              เสกเลย!
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        #qr-modal,
+        #qr-modal * {
+          visibility: visible;
+        }
+        #qr-modal {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          box-shadow: none;
+        }
+        button {
+          display: none !important;
+        }
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+      }
+      input[type="number"]::-webkit-inner-spin-button,
+      input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+    </style>
+    <script src="treasure-admin.js"></script>
+  </body>
+</html>

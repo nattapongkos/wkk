@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สำรวจพิกัด 3 มิติ (X, Y, Z)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>tailwind.config = { theme: { extend: { fontFamily: { sarabun: ['Sarabun','sans-serif'], outfit: ['Outfit','sans-serif'] } } } }</script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0f172a; font-family: 'Sarabun', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        input[type=range] { accent-color: #f43f5e; } /* สี rose-500 */
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="absolute top-4 right-4 w-80 bg-white/95 backdrop-blur-md p-6 rounded-[2rem] shadow-2xl border border-slate-200 z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <h2 class="text-xl font-bold font-outfit tracking-tighter mb-4 text-slate-800 flex items-center gap-2">
+            <span class="p-2 bg-rose-50 text-rose-500 rounded-xl">🧊</span> ควบคุมวัตถุ 3D
+        </h2>
+        
+        <div class="mb-6">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">ตำแหน่ง (Position)</p>
+            <div class="space-y-2">
+                <label class="flex items-center gap-2 text-sm font-bold text-red-500"><span class="w-4">X</span><input type="range" id="posX" min="-5" max="5" step="0.1" value="0" class="flex-1"></label>
+                <label class="flex items-center gap-2 text-sm font-bold text-green-500"><span class="w-4">Y</span><input type="range" id="posY" min="-5" max="5" step="0.1" value="0.5" class="flex-1"></label>
+                <label class="flex items-center gap-2 text-sm font-bold text-blue-500"><span class="w-4">Z</span><input type="range" id="posZ" min="-5" max="5" step="0.1" value="0" class="flex-1"></label>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">การหมุน (Rotation)</p>
+            <div class="space-y-2">
+                <label class="flex items-center gap-2 text-sm font-bold text-red-500"><span class="w-4">X</span><input type="range" id="rotX" min="0" max="6.28" step="0.1" value="0" class="flex-1"></label>
+                <label class="flex items-center gap-2 text-sm font-bold text-green-500"><span class="w-4">Y</span><input type="range" id="rotY" min="0" max="6.28" step="0.1" value="0" class="flex-1"></label>
+                <label class="flex items-center gap-2 text-sm font-bold text-blue-500"><span class="w-4">Z</span><input type="range" id="rotZ" min="0" max="6.28" step="0.1" value="0" class="flex-1"></label>
+            </div>
+        </div>
+
+        <button onclick="resetTransform()" class="w-full py-3 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all uppercase tracking-widest">รีเซ็ตค่าทั้งหมด</button>
+    </div>
+
+    <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-4 py-2 rounded-xl shadow-lg border border-slate-200 text-xs font-bold flex gap-4 z-10">
+        <span class="text-red-500">แกน X (กว้าง)</span>
+        <span class="text-green-500">แกน Y (สูง)</span>
+        <span class="text-blue-500">แกน Z (ลึก)</span>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5, 5, 5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // ไฟ
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 5);
+        scene.add(directionalLight);
+
+        // เส้นตาราง
+        const gridHelper = new THREE.GridHelper(10, 10, 0x444444, 0x222222);
+        scene.add(gridHelper);
+
+        // แกน XYZ (แดง, เขียว, น้ำเงิน)
+        const axesHelper = new THREE.AxesHelper(3);
+        scene.add(axesHelper);
+
+        // สร้างกล่อง
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const material = new THREE.MeshStandardMaterial({ color: 0x4f46e5, roughness: 0.5 }); // สี Indigo
+        const cube = new THREE.Mesh(geometry, material);
+        cube.position.y = 0.5; // ให้กล่องอยู่บนเส้นตารางพอดี
+        scene.add(cube);
+
+        // ฟังก์ชันอัปเดตกล่องเมื่อเลื่อน Slider
+        function updateCube() {
+            cube.position.set(
+                parseFloat(document.getElementById('posX').value),
+                parseFloat(document.getElementById('posY').value),
+                parseFloat(document.getElementById('posZ').value)
+            );
+            cube.rotation.set(
+                parseFloat(document.getElementById('rotX').value),
+                parseFloat(document.getElementById('rotY').value),
+                parseFloat(document.getElementById('rotZ').value)
+            );
+        }
+
+        ['posX', 'posY', 'posZ', 'rotX', 'rotY', 'rotZ'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updateCube);
+        });
+
+        function resetTransform() {
+            document.getElementById('posX').value = 0;
+            document.getElementById('posY').value = 0.5;
+            document.getElementById('posZ').value = 0;
+            document.getElementById('rotX').value = 0;
+            document.getElementById('rotY').value = 0;
+            document.getElementById('rotZ').value = 0;
+            updateCube();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ออกแบบตัวละคร: สัตว์เลี้ยง 3 มิติ (Quadruped)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>tailwind.config = { theme: { extend: { fontFamily: { prompt: ['Prompt','sans-serif'] } } } }</script>
+    <style>
+        body { 
+            margin: 0; overflow: hidden; position: fixed; width: 100%; height: 100%;
+            touch-action: none; /* ป้องกันการ Swipe บนมือถือ */
+            background-color: #0f172a; font-family: 'Prompt', sans-serif; 
+        }
+        #canvas-container { 
+            width: 100%; height: 100dvh; position: absolute; top: 0; left: 0; z-index: 1; 
+        }
+        
+        /* สไตล์ Slider โทนสีเขียว Emerald ให้เข้ากับบทที่ 3 */
+        input[type=range] { accent-color: #10b981; }
+        
+        /* สไตล์ Color Picker */
+        input[type="color"] {
+            -webkit-appearance: none; border: none; width: 36px; height: 36px;
+            border-radius: 12px; cursor: pointer; padding: 0; overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: 2px solid #ffffff; border-radius: 12px; }
+        .no-truncate { white-space: normal; word-wrap: break-word; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="absolute top-4 md:top-6 left-1/2 md:left-auto -translate-x-1/2 md:translate-x-0 md:right-6 w-[95%] md:w-80 bg-white/80 backdrop-blur-xl p-5 md:p-6 rounded-[2rem] shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] border border-white/40 z-10 max-h-[45vh] md:max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <h2 class="text-lg md:text-xl font-bold mb-4 md:mb-5 text-slate-800 flex items-center gap-3 no-truncate leading-tight">
+            <span class="p-2.5 bg-emerald-100 text-emerald-600 rounded-2xl shadow-sm shrink-0">🐺</span> โครงสร้างตัวละครสัตว์ 4 ขา
+        </h2>
+        
+        <div class="mb-5 md:mb-6 p-4 bg-white/60 rounded-2xl border border-white/50 shadow-sm">
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-sm font-bold text-slate-700">ความยาวลำตัว (Body)</span>
+                </div>
+                <input type="range" id="bodySlider" min="0.8" max="1.8" step="0.1" value="1.0" class="w-full">
+            </div>
+            
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-sm font-bold text-slate-700">ความสูงช่วงขา (Legs)</span>
+                </div>
+                <input type="range" id="legSlider" min="0.5" max="1.5" step="0.1" value="1.0" class="w-full" style="accent-color: #0ea5e9;">
+            </div>
+            <p class="text-[10px] md:text-[11px] text-slate-500 mt-3 leading-tight font-medium">สังเกตว่าเมื่อยืดลำตัว ขาหลังและหางจะต้องถูกเลื่อนตำแหน่งตามไปด้วย (Hierarchy & Parent-Child)</p>
+        </div>
+
+        <div>
+            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">ระบายสี (Texturing)</p>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between bg-white/80 p-2.5 rounded-xl border border-white shadow-sm hover:shadow-md transition-all">
+                    <span class="text-sm font-bold text-slate-700 pl-2">สีขนหลัก (Main Fur)</span>
+                    <input type="color" id="colorMain" value="#94a3b8">
+                </div>
+                <div class="flex items-center justify-between bg-white/80 p-2.5 rounded-xl border border-white shadow-sm hover:shadow-md transition-all">
+                    <span class="text-sm font-bold text-slate-700 pl-2">สีปลายหู/จมูก (Details)</span>
+                    <input type="color" id="colorDetail" value="#334155">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="hidden sm:flex absolute bottom-6 left-6 bg-white/80 backdrop-blur-xl px-5 py-3.5 rounded-2xl shadow-lg border border-white/40 z-10 items-center gap-3">
+        <div class="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold text-xl">🖱️</div>
+        <div>
+            <p class="text-sm font-bold text-slate-800">หมุนมุมมอง: <span class="text-slate-500 font-normal text-xs">คลิกซ้ายลาก / ใช้นิ้วถู</span></p>
+            <p class="text-sm font-bold text-slate-800">ซูมภาพ: <span class="text-slate-500 font-normal text-xs">ลูกกลิ้งเมาส์ / จีบนิ้ว</span></p>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // 1. ตั้งค่า Scene 
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(4, 3, 5);
+
+        // รีดประสิทธิภาพบนมือถือ
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // กันกระตุกบนจอมือถือความละเอียดสูง
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 1, 0);
+
+        // 2. จัดแสง
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        dirLight.position.set(5, 10, 5);
+        scene.add(dirLight);
+
+        // 3. เส้นตาราง
+        const gridHelper = new THREE.GridHelper(10, 10, 0x334155, 0x1e293b);
+        scene.add(gridHelper);
+
+        // 4. วัสดุ (Materials)
+        const matMain = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 }); // สีเทา
+        const matDetail = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 }); // สีเทาเข้ม
+        const matEyes = new THREE.MeshStandardMaterial({ color: 0x000000 }); // สีดำ
+
+        // 5. สร้างชิ้นส่วนสุนัข/หมาป่า
+        const petGroup = new THREE.Group();
+
+        // ตัวแปรเริ่มต้นสำหรับคำนวณตำแหน่ง
+        let baseLegH = 1.0;
+        let baseBodyD = 1.4;
+
+        // ลำตัว (Body)
+        const geoBody = new THREE.BoxGeometry(0.7, 0.7, baseBodyD);
+        const body = new THREE.Mesh(geoBody, matMain);
+        petGroup.add(body);
+
+        // หัว (Head Group - เพื่อให้ตาและหูขยับตามหัว)
+        const headGroup = new THREE.Group();
+        const geoHead = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+        const head = new THREE.Mesh(geoHead, matMain);
+        headGroup.add(head);
+
+        // จมูก (Snout)
+        const geoSnout = new THREE.BoxGeometry(0.3, 0.25, 0.3);
+        const snout = new THREE.Mesh(geoSnout, matMain);
+        snout.position.set(0, -0.1, 0.45);
+        headGroup.add(snout);
+        
+        // จมูกสีดำ (Nose tip)
+        const geoNose = new THREE.BoxGeometry(0.1, 0.05, 0.05);
+        const nose = new THREE.Mesh(geoNose, matDetail);
+        nose.position.set(0, 0.05, 0.6);
+        headGroup.add(nose);
+
+        // หู (Ears)
+        const geoEar = new THREE.BoxGeometry(0.15, 0.3, 0.15);
+        const earL = new THREE.Mesh(geoEar, matDetail);
+        earL.position.set(0.2, 0.4, -0.1);
+        headGroup.add(earL);
+        const earR = new THREE.Mesh(geoEar, matDetail);
+        earR.position.set(-0.2, 0.4, -0.1);
+        headGroup.add(earR);
+
+        // ตา (Eyes)
+        const geoEye = new THREE.BoxGeometry(0.05, 0.05, 0.05);
+        const eyeL = new THREE.Mesh(geoEye, matEyes);
+        eyeL.position.set(0.15, 0.1, 0.31);
+        headGroup.add(eyeL);
+        const eyeR = new THREE.Mesh(geoEye, matEyes);
+        eyeR.position.set(-0.15, 0.1, 0.31);
+        headGroup.add(eyeR);
+
+        petGroup.add(headGroup);
+
+        // ขา 4 ข้าง (Legs)
+        const geoLeg = new THREE.BoxGeometry(0.2, baseLegH, 0.2);
+        // เลื่อน Pivot ของขาไปไว้ที่ขอบบน (ข้อต่อสะโพก/ไหล่)
+        geoLeg.translate(0, -baseLegH/2, 0); 
+        
+        const legFL = new THREE.Mesh(geoLeg, matMain); // หน้าซ้าย
+        const legFR = new THREE.Mesh(geoLeg, matMain); // หน้าขวา
+        const legBL = new THREE.Mesh(geoLeg, matMain); // หลังซ้าย
+        const legBR = new THREE.Mesh(geoLeg, matMain); // หลังขวา
+        
+        petGroup.add(legFL);
+        petGroup.add(legFR);
+        petGroup.add(legBL);
+        petGroup.add(legBR);
+
+        // หาง (Tail)
+        const geoTail = new THREE.BoxGeometry(0.15, 0.6, 0.15);
+        geoTail.translate(0, -0.3, 0); // ตั้ง Pivot หางไว้ที่โคน
+        const tail = new THREE.Mesh(geoTail, matDetail);
+        tail.rotation.x = Math.PI / 4; // เอียงหางไปด้านหลัง
+        petGroup.add(tail);
+
+        scene.add(petGroup);
+
+        // 6. ฟังก์ชันอัปเดตสัดส่วนและการจัดวาง (Hierarchy Management)
+        function updateProportions() {
+            const bodyScale = parseFloat(document.getElementById('bodySlider').value);
+            const legScale = parseFloat(document.getElementById('legSlider').value);
+
+            // คำนวณความสูงใหม่ของขา
+            const currentLegH = baseLegH * legScale;
+
+            // 1. ปรับสเกลขา (ความสูง)
+            legFL.scale.y = legScale;
+            legFR.scale.y = legScale;
+            legBL.scale.y = legScale;
+            legBR.scale.y = legScale;
+
+            // 2. ปรับสเกลลำตัว (ความยาวแนวยาว แกน Z)
+            body.scale.z = bodyScale;
+            const currentBodyD = baseBodyD * bodyScale;
+
+            // 3. จัดตำแหน่งความสูงของลำตัวให้สัมพันธ์กับความสูงขา
+            // (ลำตัวลอยอยู่เหนือขาเล็กน้อย)
+            body.position.y = currentLegH + 0.2;
+
+            // 4. จัดตำแหน่งหัว
+            // หัวอยู่ด้านหน้าลำตัว แกน Z จะขยับออกไปตามความยาวตัว
+            headGroup.position.set(0, body.position.y + 0.3, currentBodyD / 2);
+
+            // 5. จัดตำแหน่งขาให้เกาะอยู่ตามมุมลำตัว
+            // ขาหน้า
+            legFL.position.set( 0.25, currentLegH + 0.2, (currentBodyD / 2) - 0.2 );
+            legFR.position.set(-0.25, currentLegH + 0.2, (currentBodyD / 2) - 0.2 );
+            // ขาหลัง
+            legBL.position.set( 0.25, currentLegH + 0.2, -(currentBodyD / 2) + 0.2 );
+            legBR.position.set(-0.25, currentLegH + 0.2, -(currentBodyD / 2) + 0.2 );
+
+            // 6. จัดตำแหน่งหาง
+            tail.position.set(0, body.position.y + 0.2, -(currentBodyD / 2));
+        }
+
+        // 7. ระบบโต้ตอบ (Interactions)
+        document.getElementById('bodySlider').addEventListener('input', updateProportions);
+        document.getElementById('legSlider').addEventListener('input', updateProportions);
+
+        document.getElementById('colorMain').addEventListener('input', (e) => matMain.color.set(e.target.value));
+        document.getElementById('colorDetail').addEventListener('input', (e) => matDetail.color.set(e.target.value));
+
+        // เรียกใช้ครั้งแรกเพื่อจัดตำแหน่ง
+        updateProportions();
+
+        // แอนิเมชันหางกระดิกเบาๆ
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // ทำให้หางกระดิก
+            const time = clock.getElapsedTime();
+            tail.rotation.z = Math.sin(time * 5) * 0.15;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // 8. Responsive
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

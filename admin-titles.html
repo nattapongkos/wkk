@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gacha & Titles Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=Outfit:wght@700&display=swap" rel="stylesheet">
+  <script>tailwind.config = { theme: { extend: { fontFamily: { sarabun: ['Sarabun','sans-serif'], outfit: ['Outfit','sans-serif'] } } } }</script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script>
+    const firebaseConfig = { apiKey: "AIzaSyAHAe6Q4TRjChkJuZ-z7ZT2N23Qm8Aun6U", authDomain: "wkk69-54b7c.firebaseapp.com", projectId: "wkk69-54b7c" };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+  </script>
+</head>
+<body class="bg-slate-50 font-sarabun p-4 sm:p-8">
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"></div>
+
+    <div class="max-w-5xl mx-auto">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold font-outfit text-slate-800 flex items-center gap-3"><i data-lucide="settings-2" class="text-indigo-600 w-8 h-8"></i> Gacha System Manager</h1>
+                <p class="text-slate-500 mt-1">จัดการราคาสุ่ม อัตราการดรอปเปอร์เซ็นต์ และคลังฉายา</p>
+            </div>
+            <a href="teacher.html" class="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-100 flex items-center gap-2 shadow-sm transition-colors"><i data-lucide="arrow-left" class="w-4 h-4"></i> กลับแอดมินหลัก</a>
+        </div>
+
+        <div class="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-200 mb-8 border-t-4 border-t-indigo-500">
+            <h2 class="font-bold text-xl mb-6 text-slate-800 font-outfit flex items-center gap-2"><i data-lucide="sliders" class="w-5 h-5 text-indigo-500"></i> Control Panel (ตั้งค่ากล่องสุ่ม)</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+                <div class="md:col-span-1 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2"><i data-lucide="coins" class="w-3 h-3 inline text-yellow-500"></i> ราคาสุ่ม (เหรียญ)</label>
+                    <input type="number" id="cfg-price" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 font-bold text-lg text-indigo-600">
+                </div>
+                
+                <div class="md:col-span-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2"><i data-lucide="percent" class="w-3 h-3 inline text-blue-500"></i> อัตราการสุ่มได้ (Drop Rates) <span id="rate-warning" class="text-rose-500 ml-2 hidden">* รวมกันต้องได้ 100%</span></label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-500">⚪ Common</span>
+                            <div class="relative"><input type="number" id="cfg-common" class="w-full bg-white border border-slate-200 rounded-xl pl-4 pr-8 py-2.5 outline-none focus:border-slate-500 font-bold" oninput="checkRates()"><span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">%</span></div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-bold text-blue-500">🔵 Rare</span>
+                            <div class="relative"><input type="number" id="cfg-rare" class="w-full bg-white border border-blue-200 rounded-xl pl-4 pr-8 py-2.5 outline-none focus:border-blue-500 font-bold text-blue-600" oninput="checkRates()"><span class="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 font-bold">%</span></div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-bold text-purple-500">🟣 Epic</span>
+                            <div class="relative"><input type="number" id="cfg-epic" class="w-full bg-white border border-purple-200 rounded-xl pl-4 pr-8 py-2.5 outline-none focus:border-purple-500 font-bold text-purple-600" oninput="checkRates()"><span class="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400 font-bold">%</span></div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-bold text-amber-500">🟡 Legendary</span>
+                            <div class="relative"><input type="number" id="cfg-legendary" class="w-full bg-white border border-amber-200 rounded-xl pl-4 pr-8 py-2.5 outline-none focus:border-amber-500 font-bold text-amber-600" oninput="checkRates()"><span class="absolute right-3 top-1/2 -translate-y-1/2 text-amber-400 font-bold">%</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end border-t border-slate-100 pt-4">
+                <button id="btn-save-cfg" onclick="saveSettings()" class="bg-slate-900 hover:bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-md transition-colors flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> บันทึกการตั้งค่าระบบ</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1 bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-200 h-fit">
+                <h2 class="font-bold text-lg mb-4 flex items-center gap-2 font-outfit"><i data-lucide="plus-circle" class="text-emerald-500"></i> เพิ่มฉายาใหม่</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">ชื่อฉายา</label>
+                        <input type="text" id="inp-title" placeholder="เช่น เทพเจ้าแห่งการดองงาน..." class="w-full border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">ระดับความหายาก (Rarity)</label>
+                        <select id="inp-rarity" class="w-full border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 font-bold cursor-pointer">
+                            <option value="common" class="text-slate-600">⚪ Common (ปกติ)</option>
+                            <option value="rare" class="text-blue-600">🔵 Rare (หายาก)</option>
+                            <option value="epic" class="text-purple-600">🟣 Epic (ระดับสูง)</option>
+                            <option value="legendary" class="text-amber-600">🟡 Legendary (ตำนาน)</option>
+                        </select>
+                    </div>
+                    <button onclick="addTitle()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-xl font-bold shadow-md transition-colors mt-2">เพิ่มเข้าคลังฉายา</button>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-200">
+                <h2 class="font-bold text-lg mb-6 flex items-center gap-2 font-outfit"><i data-lucide="database" class="text-indigo-500"></i> คลังฉายาในระบบทั้งหมด</h2>
+                <div id="titles-list" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <p class="text-slate-400 text-sm animate-pulse">กำลังโหลด...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        const rarityStyles = {
+            'common': 'bg-slate-50 text-slate-700 border-slate-200',
+            'rare': 'bg-blue-50 text-blue-700 border-blue-200',
+            'epic': 'bg-purple-50 text-purple-700 border-purple-200',
+            'legendary': 'bg-gradient-to-r from-yellow-50 to-amber-50 text-yellow-700 border-yellow-300 shadow-sm'
+        };
+
+        // 🌟 โหลดการตั้งค่าจาก Firebase
+        async function loadSettings() {
+            try {
+                const snap = await db.collection('settings').doc('gacha_config').get();
+                if(snap.exists) {
+                    const d = snap.data();
+                    document.getElementById('cfg-price').value = d.price || 1000;
+                    document.getElementById('cfg-common').value = d.rates.common || 50;
+                    document.getElementById('cfg-rare').value = d.rates.rare || 30;
+                    document.getElementById('cfg-epic').value = d.rates.epic || 15;
+                    document.getElementById('cfg-legendary').value = d.rates.legendary || 5;
+                } else {
+                    // ค่าเริ่มต้น
+                    document.getElementById('cfg-price').value = 1000;
+                    document.getElementById('cfg-common').value = 50; document.getElementById('cfg-rare').value = 30; document.getElementById('cfg-epic').value = 15; document.getElementById('cfg-legendary').value = 5;
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function checkRates() {
+            const c = Number(document.getElementById('cfg-common').value) || 0; const r = Number(document.getElementById('cfg-rare').value) || 0;
+            const e = Number(document.getElementById('cfg-epic').value) || 0; const l = Number(document.getElementById('cfg-legendary').value) || 0;
+            const sum = c + r + e + l;
+            const btn = document.getElementById('btn-save-cfg'); const warn = document.getElementById('rate-warning');
+            if(sum !== 100) { warn.classList.remove('hidden'); btn.disabled = true; btn.classList.replace('bg-slate-900', 'bg-slate-300'); } 
+            else { warn.classList.add('hidden'); btn.disabled = false; btn.classList.replace('bg-slate-300', 'bg-slate-900'); }
+        }
+
+        async function saveSettings() {
+            const price = Number(document.getElementById('cfg-price').value) || 1000;
+            const common = Number(document.getElementById('cfg-common').value) || 50; const rare = Number(document.getElementById('cfg-rare').value) || 30;
+            const epic = Number(document.getElementById('cfg-epic').value) || 15; const legendary = Number(document.getElementById('cfg-legendary').value) || 5;
+            
+            if(common + rare + epic + legendary !== 100) return alert('ผลรวมเปอร์เซ็นต์ต้องได้ 100% พอดีครับ');
+
+            try {
+                await db.collection('settings').doc('gacha_config').set({
+                    price: price, rates: { common: common, rare: rare, epic: epic, legendary: legendary }, updated_at: new Date().toISOString()
+                }, {merge: true});
+                showToast('บันทึกการตั้งค่ากล่องสุ่มเรียบร้อย!', 'success');
+            } catch(e) { showToast('บันทึกไม่สำเร็จ', 'error'); }
+        }
+
+        // 🌟 โหลด/เพิ่ม/ลบ ฉายา
+        async function loadTitles() {
+            const snap = await db.collection('gacha_titles').orderBy('created_at', 'desc').get();
+            const list = document.getElementById('titles-list');
+            if(snap.empty) { list.innerHTML = '<div class="col-span-full p-8 text-center bg-slate-50 rounded-xl border border-slate-200"><p class="text-slate-400 font-bold">ยังไม่มีฉายาในระบบ</p></div>'; return; }
+            
+            list.innerHTML = snap.docs.map(doc => {
+                const d = doc.data();
+                return `<div class="p-4 rounded-2xl border flex justify-between items-center ${rarityStyles[d.rarity]}">
+                    <div class="flex-1 pr-4">
+                        <span class="text-[9px] font-bold uppercase tracking-widest opacity-80 mb-1 block">${d.rarity}</span>
+                        <p class="font-bold text-base leading-tight">"${d.name}"</p>
+                    </div>
+                    <button onclick="deleteTitle('${doc.id}')" class="p-2.5 bg-white/60 hover:bg-white text-red-500 hover:text-red-600 rounded-xl transition-colors shadow-sm"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        async function addTitle() {
+            const name = document.getElementById('inp-title').value.trim(); const rarity = document.getElementById('inp-rarity').value;
+            if(!name) return showToast('กรุณาพิมพ์ชื่อฉายาก่อนครับ', 'error');
+            try {
+                await db.collection('gacha_titles').add({ name, rarity, created_at: new Date().toISOString() });
+                document.getElementById('inp-title').value = ''; loadTitles(); showToast('เพิ่มฉายาสำเร็จ!', 'success');
+            } catch(e) { showToast('บันทึกไม่สำเร็จ', 'error'); }
+        }
+
+        async function deleteTitle(id) {
+            if(confirm('แน่ใจหรือไม่ที่จะลบฉายานี้ออกจากกล่องสุ่ม?')) { 
+                await db.collection('gacha_titles').doc(id).delete(); loadTitles(); showToast('ลบสำเร็จ', 'info');
+            }
+        }
+
+        function showToast(msg, type='success') {
+            const c = document.getElementById('toast-container'); const t = document.createElement('div');
+            const colors = { success: 'border-emerald-500 text-emerald-700', error: 'border-rose-500 text-rose-700', info: 'border-blue-500 text-blue-700' };
+            t.className = `bg-white rounded-2xl px-6 py-4 flex items-center gap-3 shadow-xl border-l-4 ${colors[type]} transform transition-all duration-300 translate-y-0 opacity-100`;
+            t.innerHTML = `<span class="text-sm font-bold tracking-wide">${msg}</span>`;
+            c.appendChild(t); setTimeout(() => { t.classList.add('translate-y-10', 'opacity-0'); setTimeout(() => t.remove(), 300); }, 3000);
+        }
+
+        window.onload = () => { loadSettings(); loadTitles(); };
+    </script>
+</body>
+</html>

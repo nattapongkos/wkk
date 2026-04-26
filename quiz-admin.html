@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="th" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz Admin - จัดการข้อสอบ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>tailwind.config = { theme: { extend: { fontFamily: { sarabun: ['Sarabun','sans-serif'], outfit: ['Outfit','sans-serif'] } } } }</script>
+  <link rel="stylesheet" href="quiz-style.css">
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script>
+    const firebaseConfig = { apiKey: "AIzaSyAHAe6Q4TRjChkJuZ-z7ZT2N23Qm8Aun6U", authDomain: "wkk69-54b7c.firebaseapp.com", projectId: "wkk69-54b7c", storageBucket: "wkk69-54b7c.firebasestorage.app", messagingSenderId: "996097508438", appId: "1:996097508438:web:5bcef61e99ed3e8ba727f7" };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+  </script>
+</head>
+<body class="h-full bg-slate-50">
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"></div>
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="teacher.html" class="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><i data-lucide="arrow-left" class="w-5 h-5"></i></a>
+                <div><h1 class="text-xl font-bold text-slate-800 font-outfit">Quiz Admin</h1><p class="text-xs text-indigo-500 font-bold">ระบบสร้างข้อสอบออนไลน์</p></div>
+            </div>
+            <button onclick="openCreateModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-md shadow-indigo-200 transition-all"><i data-lucide="plus" class="w-4 h-4"></i> สร้างข้อสอบใหม่</button>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 py-8 slide-up">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2"><i data-lucide="folder-open" class="w-5 h-5 text-indigo-500"></i> คลังข้อสอบของคุณ</h2>
+            <select id="filter-course" onchange="renderQuizzes()" class="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 shadow-sm"></select>
+        </div>
+        <div id="quiz-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    </main>
+
+    <div id="quiz-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-[2rem] w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="text-xl font-bold text-slate-800">ตั้งค่าข้อสอบ</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-red-500 p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1 custom-scrollbar">
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div><label class="text-xs font-bold text-slate-400 mb-2 block uppercase">เลือกวิชา</label><select id="inp-q-course" onchange="updateCategoryOptions()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none focus:border-indigo-500"></select></div>
+                    <div><label class="text-xs font-bold text-slate-400 mb-2 block uppercase">ผูกกับช่องคะแนน</label><select id="inp-q-title" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none focus:border-indigo-500"></select></div>
+                </div>
+                <div class="flex items-center justify-between mb-4 border-t border-slate-100 pt-6">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i data-lucide="list-checks" class="w-5 h-5 text-emerald-500"></i> คำถามทั้งหมด</h4>
+                    <button type="button" onclick="addQuestionBlock()" class="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center gap-1"><i data-lucide="plus-circle" class="w-4 h-4"></i> เพิ่มข้อ</button>
+                </div>
+                <div id="questions-container" class="space-y-4"></div>
+            </div>
+            <div class="p-6 border-t border-slate-100 flex gap-4 bg-white">
+                <div class="flex items-center gap-2 flex-1">
+                    <input type="checkbox" id="inp-q-active" class="w-5 h-5 accent-emerald-500 cursor-pointer" checked>
+                    <label class="text-sm font-bold text-slate-700 cursor-pointer">เปิดระบบให้เด็กเข้าสอบได้ทันที</label>
+                </div>
+                <button onclick="saveQuiz()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-2xl text-sm font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> บันทึกข้อสอบ</button>
+            </div>
+        </div>
+    </div>
+    <div id="custom-confirm-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden bg-slate-900/50 backdrop-blur-sm transition-opacity opacity-0 duration-300">
+        <div class="bg-white p-8 rounded-[2rem] w-full max-w-sm text-center border border-slate-200 shadow-2xl relative overflow-hidden transform scale-95 transition-transform duration-300" id="custom-confirm-box">
+            <div id="confirm-color-bar" class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-500 to-rose-600"></div>
+            <div id="confirm-icon-container" class="w-20 h-20 rounded-3xl bg-red-50 flex items-center justify-center mx-auto mb-6 border border-red-100">
+                <i id="confirm-icon" data-lucide="trash-2" class="w-10 h-10 text-red-500"></i>
+            </div>
+            <h3 id="confirm-title" class="font-bold text-slate-800 mb-3 text-2xl font-outfit tracking-tighter">ยืนยันการลบ</h3>
+            <p id="confirm-message" class="text-sm text-slate-500 mb-8 leading-relaxed px-2">คุณแน่ใจหรือไม่?</p>
+            <div class="flex gap-4">
+                <button onclick="closeConfirmModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-500 py-3.5 rounded-2xl text-xs font-bold transition-all uppercase tracking-widest">ยกเลิก</button>
+                <button id="btn-confirm-action" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-3.5 rounded-2xl text-xs font-bold transition-all shadow-lg shadow-red-200 uppercase tracking-widest">ยืนยัน</button>
+            </div>
+        </div>
+    </div>
+    <script src="quiz-admin.js"></script>
+</body>
+</html>

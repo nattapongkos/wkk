@@ -1,0 +1,207 @@
+* { box-sizing: border-box; font-family: 'Prompt', sans-serif; }
+
+/* 🌟 ตีมพื้นหลังสว่างแบบพรีเมียม */
+body { 
+    background-color: #f8fafc;
+    background-image: 
+        radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+        radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+        radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+    /* background-attachment: fixed; 🚨 ลบหรือคอมเมนต์บรรทัดนี้ทิ้งไปเลยครับ! */
+    color: #1e293b; 
+    margin: 0; 
+    min-height: 100vh;
+}
+
+/* ค้นหาคลาสนี้ในไฟล์ submit-style.css */
+.glass-panel { 
+    /* 1. ลดความฟุ้ง (Blur): ยิ่งค่าน้อย แสงจะยิ่งดูไม่ฟุ้งกระจาย */
+    backdrop-filter: blur(4px); /* ลองลดเหลือ 2px หรือ 0px เพื่อความคลีน */
+    -webkit-backdrop-filter: blur(4px);
+
+    /* 2. ปรับความทึบของพื้นหลัง: ปรับให้ขาวทึบขึ้นจะช่วยลดการสะท้อนแสงจากพื้นหลัง */
+    background: rgba(255, 255, 255, 0.96); /* ปรับจาก 0.92 เป็น 0.95 หรือ 0.98 */
+
+    /* 3. ตรวจสอบขอบ (Border): ถ้าขาวเกินไปให้ลดความชัดลง */
+    border: 1px solid rgba(255, 255, 255, 0.2); 
+}
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease;
+    /* 🚨 ลบ transform: translateZ(0); ออกเช่นกัน */
+}
+.glass-card:hover {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-5px); 
+    box-shadow: 0 15px 35px 0 rgba(99, 102, 241, 0.15);
+    border-color: #e0e7ff;
+}
+
+/* แอนิเมชันต่างๆ */
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+.slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.fade-in { animation: fadeIn 0.5s ease forwards; }
+
+/* Scrollbar */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Modals */
+.modal-overlay { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(8px); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 100; }
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal-box { transform: scale(0.95) translateY(20px); opacity: 0; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.modal-overlay.active .modal-box { transform: scale(1) translateY(0); opacity: 1; }
+
+/* Toast */
+.toast-show { animation: slideUp 0.3s ease-out forwards; }
+.toast-hide { opacity: 0; transform: translateY(10px); transition: all 0.3s; }
+
+/* ปรับฟอร์ม Input แบบสว่าง */
+input, textarea, select { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; color: #1e293b !important; }
+input:focus, textarea:focus, select:focus { border-color: #8b5cf6 !important; outline: none !important; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2) !important; background: #ffffff !important; }
+input::placeholder, textarea::placeholder { color: #94a3b8 !important; }
+select option { background-color: #ffffff; color: #1e293b; }
+
+/* 🌟 เอฟเฟกต์ปุ่มเลือกอารมณ์ (Mood Tracker) */
+.mood-btn { opacity: 0.7; filter: grayscale(50%); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.mood-btn:hover { opacity: 1; filter: grayscale(0%); transform: scale(1.05); }
+.mood-btn.active-happy { opacity: 1; filter: grayscale(0%); background: rgba(236, 72, 153, 0.1); border-color: #f472b6; transform: scale(1.1); box-shadow: 0 10px 25px -5px rgba(236, 72, 153, 0.3); }
+.mood-btn.active-calm { opacity: 1; filter: grayscale(0%); background: rgba(59, 130, 246, 0.1); border-color: #60a5fa; transform: scale(1.1); box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.3); }
+.mood-btn.active-tired { opacity: 1; filter: grayscale(0%); background: rgba(249, 115, 22, 0.1); border-color: #fb923c; transform: scale(1.1); box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.3); }
+.mood-btn.active-sick { opacity: 1; filter: grayscale(0%); background: rgba(16, 185, 129, 0.1); border-color: #34d399; transform: scale(1.1); box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.3); }
+
+/* 🌟 แอนิเมชันกล่องกาชาสั่น */
+@keyframes gachaShake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+.animate-gacha-shake {
+    animation: gachaShake 0.5s infinite; /* สั่นวนไปเรื่อยๆ จนกว่าจะโหลดเสร็จ */
+    filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.6));
+}
+
+
+
+
+/* 🌊 Liquid Glass Effect: นุ่มนวล ดูมีชีวิตชีวา */
+.liquid-glass {
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+    transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.liquid-glass:hover {
+    transform: translateY(-4px) scale(1.01);
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 15px 35px 0 rgba(99, 102, 241, 0.15);
+}
+
+/* 🕹️ 2.5D Button: ปุ่มสไตล์ตู้เกม กดแล้วยุบตัว (Squishy) */
+.btn-25d {
+    transition: all 0.15s ease;
+}
+.btn-25d:hover {
+    transform: translateY(-2px);
+}
+.btn-25d:active {
+    transform: translateY(6px); /* ยุบตัวลงไปทับเงา */
+    box-shadow: none !important;
+}
+
+/* 🕹️ 2.5D Squishy Button */
+.btn-squishy {
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-squishy:active {
+    transform: scale(0.96) translateY(6px); /* หดตัวนิดๆ และยุบลงไปทับเงา */
+    box-shadow: 0 0px 0 0 transparent !important;
+}
+
+/* 🌊 แอนิเมชันสำหรับ Liquid Blob */
+@keyframes blob-bounce {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+.animate-blob {
+  animation: blob-bounce 7s infinite alternate cubic-bezier(0.45, 0.05, 0.55, 0.95);
+}
+
+.panel-25d {
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 2px solid #f1f5f9;
+    box-shadow: 4px 4px 0px #e2e8f0;
+    border-radius: 1.5rem;
+    
+    /* สั่งให้เบราว์เซอร์เตรียมตัว และกันอาการภาพฉีก */
+    will-change: transform; 
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0); 
+    
+    /* เน้นเปลี่ยนแค่ตำแหน่ง (transform) จะลื่นที่สุดครับ */
+    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.panel-25d:hover {
+    transform: translate(-2px, -2px);
+    /* เอา box-shadow และ border-color ออกจาก Hover เพื่อไม่ให้การ์ดจอคำนวณเงาใหม่ทุกครั้งที่เมาส์ชี้ */
+}
+
+/* 💎 Treasure Item Card: ปรับชิ้นส่วนสมบัติให้ดูเหมือนการ์ดสะสม */
+#completed-quests .treasure-card {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 1.5rem;
+    padding: 1rem;
+    box-shadow: 6px 6px 0px #cbd5e1; /* เงาแข็งแบบ 2.5D */
+    transition: all 0.2s ease;
+}
+
+#completed-quests .treasure-card:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 9px 9px 0px #94a3b8;
+    border-color: #fbbf24;
+}
+
+
+
+
+/* Animation สำหรับสไลด์ข่าว */
+@keyframes newsFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(15px) scale(0.98);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.news-slider-item {
+    animation: newsFadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}

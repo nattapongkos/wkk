@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ประกอบร่างและลงสีไอเทม 3 มิติ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>tailwind.config = { theme: { extend: { fontFamily: { sarabun: ['Sarabun','sans-serif'], outfit: ['Outfit','sans-serif'] } } } }</script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1e293b; font-family: 'Sarabun', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        input[type=range] { accent-color: #f59e0b; } /* สี amber-500 */
+        /* ปรับแต่งช่องเลือกสี */
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            cursor: pointer;
+            padding: 0;
+            overflow: hidden;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: 2px solid #e2e8f0; border-radius: 8px; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="absolute top-4 right-4 w-80 bg-white/95 backdrop-blur-md p-6 rounded-[2rem] shadow-2xl border border-slate-200 z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <h2 class="text-xl font-bold font-outfit tracking-tighter mb-4 text-slate-800 flex items-center gap-2">
+            <span class="p-2 bg-amber-50 text-amber-500 rounded-xl">⚔️</span> สร้างไอเทม (Prop)
+        </h2>
+        
+        <div class="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <div class="flex justify-between items-center mb-2">
+                <p class="text-xs font-bold text-slate-600 uppercase tracking-widest">โหมดแยกชิ้นส่วน</p>
+                <span id="explode-val" class="text-xs font-bold text-amber-500">ปิด</span>
+            </div>
+            <input type="range" id="explodeSlider" min="0" max="2" step="0.1" value="0" class="w-full">
+            <p class="text-[10px] text-slate-400 mt-2 leading-tight">เลื่อนเพื่อดูว่าโมเดลนี้ประกอบขึ้นจากกล่องสี่เหลี่ยมกี่ชิ้น</p>
+        </div>
+
+        <div class="mb-4">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">การลงสีพื้นผิว (Texturing)</p>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between bg-white p-2 rounded-xl border border-slate-100 shadow-sm">
+                    <span class="text-sm font-bold text-slate-700 pl-2">ใบมีด (Blade)</span>
+                    <input type="color" id="colorBlade" value="#cbd5e1">
+                </div>
+                <div class="flex items-center justify-between bg-white p-2 rounded-xl border border-slate-100 shadow-sm">
+                    <span class="text-sm font-bold text-slate-700 pl-2">กระบังดาบ (Guard)</span>
+                    <input type="color" id="colorGuard" value="#fbbf24">
+                </div>
+                <div class="flex items-center justify-between bg-white p-2 rounded-xl border border-slate-100 shadow-sm">
+                    <span class="text-sm font-bold text-slate-700 pl-2">ด้ามจับ (Handle)</span>
+                    <input type="color" id="colorHandle" value="#78350f">
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-5 py-3 rounded-2xl shadow-lg border border-slate-200 z-10 flex items-center gap-3">
+        <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500">🖱️</div>
+        <div>
+            <p class="text-xs font-bold text-slate-800">คลิกซ้ายค้างแล้วลาก <span class="text-slate-400 font-normal">เพื่อหมุนมุมมอง</span></p>
+            <p class="text-xs font-bold text-slate-800">เลื่อนลูกกลิ้งเมาส์ <span class="text-slate-400 font-normal">เพื่อซูมเข้า-ออก</span></p>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // 1. ตั้งค่า Scene เบื้องต้น
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5, 5, 8); // ขยับกล้องออกมาให้เห็นดาบชัดเจน
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 1.5, 0); // โฟกัสไปที่กลางดาบ
+
+        // 2. จัดแสง (Lighting)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 20, 10);
+        scene.add(directionalLight);
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        fillLight.position.set(-10, 0, -10);
+        scene.add(fillLight);
+
+        // 3. เส้นตารางพื้น
+        const gridHelper = new THREE.GridHelper(15, 15, 0x475569, 0x334155);
+        scene.add(gridHelper);
+
+        // 4. สร้างชิ้นส่วนดาบ (Prop Assembly)
+        const swordGroup = new THREE.Group();
+
+        // วัสดุตั้งต้น
+        const matBlade = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.3, metalness: 0.8 }); // เหล็ก
+        const matGuard = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.4, metalness: 0.6 }); // ทอง
+        const matHandle = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9, metalness: 0.1 }); // ไม้/หนัง
+
+        // ใบมีด (Blade) - กล่องทรงสูงแบน
+        const geoBlade = new THREE.BoxGeometry(0.8, 4, 0.2);
+        const blade = new THREE.Mesh(geoBlade, matBlade);
+        const baseBladeY = 3.2; 
+        blade.position.set(0, baseBladeY, 0);
+        swordGroup.add(blade);
+
+        // กระบังดาบ (Guard) - กล่องแนวนอน
+        const geoGuard = new THREE.BoxGeometry(2, 0.4, 0.6);
+        const guard = new THREE.Mesh(geoGuard, matGuard);
+        const baseGuardY = 1;
+        guard.position.set(0, baseGuardY, 0);
+        swordGroup.add(guard);
+
+        // ด้ามจับ (Handle) - กล่องทรงกระบอกเหลี่ยม
+        const geoHandle = new THREE.BoxGeometry(0.4, 1.5, 0.4);
+        const handle = new THREE.Mesh(geoHandle, matHandle);
+        const baseHandleY = 0.05;
+        handle.position.set(0, baseHandleY, 0);
+        swordGroup.add(handle);
+
+        scene.add(swordGroup);
+
+        // 5. ระบบโต้ตอบ (Interactivity)
+
+        // ระบบแยกชิ้นส่วน (Explode View)
+        const explodeSlider = document.getElementById('explodeSlider');
+        const explodeValText = document.getElementById('explode-val');
+
+        explodeSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            
+            // อัปเดตข้อความ UI
+            if(val === 0) explodeValText.textContent = "ปิด";
+            else if(val > 1.5) explodeValText.textContent = "แยกสูงสุด";
+            else explodeValText.textContent = "กำลังแยก...";
+
+            // ขยับชิ้นส่วนใบมีดขึ้น และด้ามจับลง โดยอิงจากกระบังดาบเป็นแกนกลาง
+            blade.position.y = baseBladeY + (val * 1.5);
+            handle.position.y = baseHandleY - (val * 1.2);
+        });
+
+        // ระบบเปลี่ยนสี
+        document.getElementById('colorBlade').addEventListener('input', (e) => {
+            matBlade.color.set(e.target.value);
+        });
+        document.getElementById('colorGuard').addEventListener('input', (e) => {
+            matGuard.color.set(e.target.value);
+        });
+        document.getElementById('colorHandle').addEventListener('input', (e) => {
+            matHandle.color.set(e.target.value);
+        });
+
+        // 6. การ Render Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // 7. Responsive
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

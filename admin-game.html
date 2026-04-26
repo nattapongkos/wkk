@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Assets Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        if (localStorage.getItem('teacher_access_granted') !== 'super_admin_mode') {
+            alert('🚨 คุณไม่มีสิทธิ์เข้าถึงหน้านี้! (Access Denied)'); window.location.href = 'index.html'; 
+        }
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyAHAe6Q4TRjChkJuZ-z7ZT2N23Qm8Aun6U", authDomain: "wkk69-54b7c.firebaseapp.com", projectId: "wkk69-54b7c", storageBucket: "wkk69-54b7c.firebasestorage.app", messagingSenderId: "996097508438", appId: "1:996097508438:web:5bcef61e99ed3e8ba727f7" };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig); const db = firebase.firestore();
+    </script>
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; }
+        .panel-25d { background: rgba(255, 255, 255, 0.95); border: 2px solid #f1f5f9; box-shadow: 6px 6px 0px #e2e8f0; border-radius: 2rem; transition: all 0.3s; }
+        .input-group label { display: block; font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 4px; padding-left: 4px; }
+        .input-group input, .input-group select { width: 100%; border: 2px solid #e2e8f0; border-radius: 1rem; padding: 12px 16px; outline: none; font-weight: bold; transition: border-color 0.2s; }
+        .input-group input:focus, .input-group select:focus { border-color: #6366f1; }
+        div:where(.swal2-container) div:where(.swal2-popup) { border-radius: 1.5rem; font-family: 'Sarabun', sans-serif; }
+    </style>
+</head>
+<body class="p-8 pb-20 max-w-5xl mx-auto">
+
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-black text-slate-800">World Map Manager</h1>
+            <p class="text-slate-500 font-bold">จัดการแผนที่, จุดวาร์ป, วัตถุให้ความรู้, NPC และมอนสเตอร์</p>
+        </div>
+        <button onclick="saveAdminData()" id="btn-save" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-2xl font-bold shadow-[0_6px_0_#4f46e5] active:translate-y-[6px] active:shadow-none transition-all flex items-center gap-2 shrink-0 relative z-50">
+            <i data-lucide="save" class="w-5 h-5"></i> บันทึกข้อมูลทั้งหมด
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="panel-25d p-6 border-amber-200">
+            <h3 class="text-lg font-bold text-amber-600 mb-4 flex items-center gap-2"><i data-lucide="settings"></i> ระบบเกม (Global)</h3>
+            <div class="space-y-4">
+                <div class="input-group"><label class="text-amber-600">ราคา Potion (เหรียญ)</label><input type="number" id="sys-potion-price" value="50" class="border-amber-200 bg-amber-50"></div>
+                <button onclick="openExpSettings()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all text-sm">ตั้งค่าตาราง EXP</button>
+            </div>
+        </div>
+        <div class="panel-25d p-6 border-emerald-200">
+            <h3 class="text-lg font-bold text-emerald-600 mb-4 flex items-center gap-2"><i data-lucide="user"></i> ตัวละครผู้เล่น (Global)</h3>
+            <div class="input-group">
+                <label class="text-emerald-600">URL สไปรท์ตัวละคร</label>
+                <input type="text" id="char-url" class="border-emerald-200" placeholder="วางลิงก์รูปตัวละครที่นี่..." oninput="document.getElementById('preview-char').src=this.value; document.getElementById('preview-char-box').classList.remove('hidden');">
+            </div>
+            <div id="preview-char-box" class="w-full h-24 bg-emerald-50 rounded-xl mt-3 border border-emerald-200 flex items-center justify-center hidden p-2">
+                <img id="preview-char" class="max-h-full object-contain drop-shadow-md">
+            </div>
+        </div>
+    </div>
+
+    <div class="panel-25d p-8 mb-8 border-indigo-300 bg-indigo-50/30">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+            <h3 class="text-2xl font-black text-indigo-700 flex items-center gap-2"><i data-lucide="map"></i> เลือกแผนที่เพื่อแก้ไข</h3>
+            <div class="flex gap-2 w-full md:w-auto">
+                <select id="map-selector" onchange="changeMap(this.value)" class="border-2 border-indigo-300 rounded-xl px-4 py-3 font-black text-indigo-700 outline-none flex-1 md:w-64 bg-white shadow-sm focus:border-indigo-500"></select>
+                <button onclick="createNewMap()" class="bg-indigo-100 text-indigo-600 px-4 py-2 rounded-xl font-bold hover:bg-indigo-200 shrink-0 border border-indigo-200 shadow-sm">+ สร้างแผนที่ใหม่</button>
+            </div>
+        </div>
+
+        <div class="bg-white border-l-4 border-indigo-500 p-4 rounded-r-xl rounded-bl-xl shadow-sm mb-6 text-sm">
+            <p class="text-indigo-800 font-bold mb-1 flex items-center gap-2"><i data-lucide="info" class="w-4 h-4"></i> ทราบหรือไม่?</p>
+            <p class="text-slate-600">ฉากและวัตถุต่างๆ จะถูกเซฟลงในแผนที่ที่คุณกำลังเลือกด้านบน หากต้องการแก้ไขฉากอื่น ให้เปลี่ยน Dropdown ก่อนนะครับ</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+            <div class="input-group md:col-span-2">
+                <label class="text-indigo-600">ชื่อแผนที่ (ตั้งให้จำง่ายๆ)</label>
+                <input type="text" id="map-name" oninput="updateCurrentMapName(this.value)" class="border-indigo-200" placeholder="เช่น ด่านป่ามรณะ, หมู่บ้านเริ่มต้น">
+            </div>
+            <div class="space-y-3">
+                <div class="input-group"><label class="text-indigo-600">URL ภาพพื้นหลัง (Background)</label><input type="text" id="env-bg" class="border-indigo-200" placeholder="ภาพวิวฉากหลัง..." oninput="document.getElementById('preview-bg').src=this.value;"></div>
+                <div class="w-full h-32 bg-slate-200 rounded-xl overflow-hidden border-2 border-slate-300 shadow-inner"><img id="preview-bg" class="w-full h-full object-cover"></div>
+            </div>
+            <div class="space-y-3">
+                <div class="input-group"><label class="text-amber-700">URL ภาพพื้นดิน (Ground)</label><input type="text" id="env-ground" class="border-amber-200 focus:border-amber-500" placeholder="ภาพบล็อกพื้นดิน..." oninput="document.getElementById('preview-ground').src=this.value; document.getElementById('preview-ground-box').classList.remove('hidden');"></div>
+                <div id="preview-ground-box" class="w-full h-12 bg-amber-50 rounded-xl overflow-hidden border border-amber-200 shadow-inner hidden"><img id="preview-ground" class="w-full h-full object-cover"></div>
+                <div class="input-group pt-2"><label class="text-sky-600">URL ภาพบอร์ดคะแนน (เว้นว่างได้)</label><input type="text" id="env-board" class="border-sky-200 focus:border-sky-500" placeholder="ภาพกระดาน..." oninput="document.getElementById('preview-board').src=this.value; document.getElementById('preview-board-box').classList.remove('hidden');"></div>
+                <div id="preview-board-box" class="w-20 h-24 bg-sky-50 rounded-xl mx-auto border border-sky-200 flex items-center justify-center p-1 hidden shadow-inner"><img id="preview-board" class="max-h-full object-contain"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel-25d p-8 mb-8 border-cyan-200">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-cyan-700 flex items-center gap-2"><i data-lucide="door-open"></i> จุดวาร์ป (Portals)</h3>
+            <button onclick="addPortalRow()" class="bg-cyan-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-cyan-600 shadow-[0_4px_0_0_#0891b2] active:translate-y-[4px] active:shadow-none transition-all">+ เพิ่มจุดวาร์ป</button>
+        </div>
+        <div id="portal-list" class="space-y-4"></div>
+    </div>
+
+    <div class="panel-25d p-8 mb-8 border-emerald-200">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-emerald-600 flex items-center gap-2"><i data-lucide="tree-pine"></i> จัดวางวัตถุ (ป้าย, ต้นไม้, ให้ความรู้)</h3>
+            <button onclick="addObjectRow()" class="bg-emerald-100 text-emerald-600 px-4 py-2 rounded-xl font-bold hover:bg-emerald-200 shadow-[0_4px_0_0_#d1fae5] active:translate-y-[4px] active:shadow-none transition-all">+ เพิ่มวัตถุ</button>
+        </div>
+        <div id="object-list" class="space-y-4"></div>
+    </div>
+
+    <div class="panel-25d p-8 mb-8 border-orange-200">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-orange-500 flex items-center gap-2"><i data-lucide="bot"></i> จัดวาง NPC</h3>
+            <button onclick="addNpcRow()" class="bg-orange-100 text-orange-600 px-4 py-2 rounded-xl font-bold hover:bg-orange-200 shadow-[0_4px_0_0_#ffedd5] active:translate-y-[4px] active:shadow-none">+ เพิ่ม NPC</button>
+        </div>
+        <div id="npc-list" class="space-y-4"></div>
+    </div>
+
+    <div class="panel-25d p-8 border-rose-200">
+        <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-2">
+                <h3 class="text-xl font-bold text-rose-600 flex items-center gap-2"><i data-lucide="swords"></i> จัดวางมอนสเตอร์</h3>
+            </div>
+            <button onclick="addMonsterRow()" class="bg-rose-100 text-rose-600 px-4 py-2 rounded-xl font-bold hover:bg-rose-200 shadow-[0_4px_0_0_#ffe4e6] active:translate-y-[4px] active:shadow-none">+ เพิ่มมอนสเตอร์</button>
+        </div>
+        <div id="monster-list" class="space-y-4"></div>
+    </div>
+
+    <script src="admin-game.js"></script>
+</body>
+</html>

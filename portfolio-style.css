@@ -1,0 +1,33 @@
+* { box-sizing: border-box; font-family: 'Sarabun', 'Outfit', sans-serif; }
+body { background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
+
+/* Animations */
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+.slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Scrollbar */
+.custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Modals - ทำให้สวยแบบกระจก */
+.modal-overlay { background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(12px); opacity: 0; pointer-events: none; transition: opacity 0.4s ease; z-index: 100; }
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal-box { transform: scale(0.95) translateY(20px); opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.modal-overlay.active .modal-box { transform: scale(1) translateY(0); opacity: 1; }
+
+/* UI Elements */
+.glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.5); box-shadow: 0 10px 40px -10px rgba(0,0,0,0.08); }
+.gradient-text { background: linear-gradient(135deg, #8b5cf6, #d946ef); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.gradient-btn { background: linear-gradient(135deg, #8b5cf6, #d946ef); transition: all 0.3s ease; }
+.gradient-btn:hover { background: linear-gradient(135deg, #7c3aed, #c026d3); box-shadow: 0 10px 25px -5px rgba(217, 70, 239, 0.4); transform: translateY(-2px); }
+
+/* Grid Images */
+.album-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.album-grid img { width: 100%; height: 120px; object-fit: cover; border-radius: 16px; cursor: pointer; transition: transform 0.3s, box-shadow 0.3s; }
+.album-grid img:hover { transform: scale(1.05); box-shadow: 0 10px 20px rgba(0,0,0,0.15); z-index: 10; position: relative; }
+
+/* Toast Popup */
+.toast-show { animation: slideUp 0.4s ease-out forwards; }
+.toast-hide { opacity: 0; transform: translateY(20px); transition: all 0.3s; }

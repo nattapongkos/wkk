@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จำลองจุดหมุนและแอนิเมชัน 3 มิติ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>tailwind.config = { theme: { extend: { fontFamily: { sarabun: ['Sarabun','sans-serif'], outfit: ['Outfit','sans-serif'] } } } }</script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0f172a; font-family: 'Sarabun', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        input[type=range] { accent-color: #8b5cf6; } /* สี violet-500 */
+        
+        /* ตกแต่ง Checkbox สวิตช์ */
+        .toggle-checkbox:checked { right: 0; border-color: #8b5cf6; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #8b5cf6; }
+        
+        /* ป้ายชื่อ 3D ลอยตัว (CSS Overlay) */
+        .label-3d { position: absolute; transform: translate(-50%, -50%); color: white; font-weight: bold; font-size: 14px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); pointer-events: none; z-index: 5; text-align: center;}
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="absolute top-4 right-4 w-80 bg-white/95 backdrop-blur-md p-6 rounded-[2rem] shadow-2xl border border-slate-200 z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <h2 class="text-xl font-bold font-outfit tracking-tighter mb-4 text-slate-800 flex items-center gap-2">
+            <span class="p-2 bg-violet-50 text-violet-500 rounded-xl">🦴</span> จุดหมุน (Pivot)
+        </h2>
+        
+        <p class="text-xs text-slate-500 mb-6 leading-relaxed">
+            จุดหมุนคือหัวใจสำคัญของการทำแอนิเมชัน หากจุดหมุนอยู่ผิดที่ ชิ้นส่วนจะเคลื่อนไหวผิดธรรมชาติทันที
+        </p>
+
+        <div class="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <div class="flex justify-between items-center mb-2">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">ทดสอบหมุนแขน</p>
+                <span id="rot-val" class="text-xs font-bold text-violet-500">0°</span>
+            </div>
+            <input type="range" id="rotSlider" min="-2" max="2" step="0.05" value="0" class="w-full">
+        </div>
+
+        <div class="mb-4">
+            <label class="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-violet-300 transition-all">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-bold text-slate-700">จำลองท่าเดิน (Walk Cycle)</span>
+                </div>
+                <input type="checkbox" id="autoAnimate" class="w-5 h-5 accent-violet-500 rounded cursor-pointer">
+            </label>
+            <p class="text-[10px] text-slate-400 mt-2 px-1">เมื่อเปิดระบบนี้ โปรแกรมจะสร้าง Keyframe วนลูปการแกว่งแขนอัตโนมัติ</p>
+        </div>
+    </div>
+
+    <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-5 py-3 rounded-2xl shadow-lg border border-slate-200 z-10 flex items-center gap-3">
+        <div class="w-8 h-8 bg-violet-50 rounded-full flex items-center justify-center text-violet-500 font-bold">!</div>
+        <div>
+            <p class="text-xs font-bold text-slate-800">กฎเหล็กของการทำ Rigging</p>
+            <p class="text-xs text-slate-500">ต้องย้ายจุด Pivot ไปไว้ที่ <span class="text-violet-600 font-bold">"ข้อต่อ"</span> เสมอก่อนทำแอนิเมชัน</p>
+        </div>
+    </div>
+
+    <div id="label-wrong" class="label-3d">
+        ❌ ผิด<br><span class="text-[10px] text-red-300 font-normal">จุดหมุนอยู่ตรงกลาง</span>
+    </div>
+    <div id="label-correct" class="label-3d">
+        ✅ ถูกต้อง<br><span class="text-[10px] text-green-300 font-normal">จุดหมุนอยู่ที่หัวไหล่</span>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // 1. ตั้งค่า Scene เบื้องต้น
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 5, 12);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 3, 0);
+
+        // แสงสว่าง
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 10, 10);
+        scene.add(dirLight);
+
+        const gridHelper = new THREE.GridHelper(20, 20, 0x475569, 0x334155);
+        scene.add(gridHelper);
+
+        // 2. สร้างโมเดลแขน (Arm Models)
+        const armGeometry = new THREE.BoxGeometry(0.8, 4, 0.8);
+        const wrongMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.5 }); // แขนผิด (สีแดง)
+        const correctMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.5 }); // แขนถูก (สีเขียว)
+
+        // จุดศูนย์กลาง (แสดงเป็นลูกแก้วเล็กๆ ให้เห็นชัดเจน)
+        const pivotGeo = new THREE.SphereGeometry(0.3, 16, 16);
+        const pivotMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
+
+        // --- แขนซ้าย (ผิด: จุดหมุนอยู่ตรงกลาง) ---
+        const wrongArm = new THREE.Mesh(armGeometry, wrongMat);
+        wrongArm.position.set(-3, 3, 0); // วางตำแหน่งปกติ (Three.js จุดศูนย์กลางของ Box จะอยู่ตรงกลางโดยปริยาย)
+        scene.add(wrongArm);
+
+        const wrongPivot = new THREE.Mesh(pivotGeo, pivotMat);
+        wrongPivot.position.set(-3, 3, 0.45); // แปะไว้ตรงกลางแขนให้เห็นชัดๆ
+        scene.add(wrongPivot);
+
+        // --- แขนขวา (ถูก: จุดหมุนอยู่ที่หัวไหล่) ---
+        // เทคนิคคือสร้าง Group (เป็นตัวแทนจุดหมุน) แล้วเอาแขนไปใส่ใน Group แบบเยื้องศูนย์กลาง
+        const correctArmGroup = new THREE.Group();
+        correctArmGroup.position.set(3, 5, 0); // วาง Group ไว้ที่ตำแหน่ง "หัวไหล่" (สูง 5)
+        
+        const correctArmMesh = new THREE.Mesh(armGeometry, correctMat);
+        correctArmMesh.position.set(0, -2, 0); // เลื่อนแขนลงมา 2 หน่วย (ครึ่งนึงของความสูงแขน 4) ทำให้ยอดแขนแตะที่ Group พอดี
+        correctArmGroup.add(correctArmMesh);
+        scene.add(correctArmGroup);
+
+        const correctPivot = new THREE.Mesh(pivotGeo, pivotMat);
+        correctPivot.position.set(3, 5, 0.45); // แปะไว้ที่หัวไหล่
+        scene.add(correctPivot);
+
+
+        // 3. ระบบโต้ตอบ (Interactivity)
+        const rotSlider = document.getElementById('rotSlider');
+        const rotVal = document.getElementById('rot-val');
+        const autoAnimateCheckbox = document.getElementById('autoAnimate');
+        
+        let isAutoAnimate = false;
+
+        rotSlider.addEventListener('input', (e) => {
+            if(isAutoAnimate) {
+                autoAnimateCheckbox.checked = false;
+                isAutoAnimate = false;
+            }
+            updateRotation(parseFloat(e.target.value));
+        });
+
+        autoAnimateCheckbox.addEventListener('change', (e) => {
+            isAutoAnimate = e.target.checked;
+        });
+
+        function updateRotation(radians) {
+            wrongArm.rotation.z = radians;       // หมุนที่ตัว Mesh โดยตรง (จุดหมุนอยู่กลาง)
+            correctArmGroup.rotation.z = radians; // หมุนที่ตัว Group (จุดหมุนอยู่ที่หัวไหล่)
+            
+            // แปลงเรเดียนเป็นองศาเพื่อแสดงผลให้เด็กเข้าใจง่าย
+            const degrees = Math.round(radians * (180 / Math.PI));
+            rotVal.textContent = degrees + '°';
+        }
+
+        // 4. จัดการป้าย 2D ให้ลอยตาม 3D (HTML Overlay)
+        const labelWrong = document.getElementById('label-wrong');
+        const labelCorrect = document.getElementById('label-correct');
+
+        function updateLabels() {
+            // คำนวณตำแหน่ง 3D ไปเป็น 2D Screen
+            const wrongPos = new THREE.Vector3(-3, 6, 0).project(camera);
+            const correctPos = new THREE.Vector3(3, 6, 0).project(camera);
+
+            const xWrong = (wrongPos.x * .5 + .5) * window.innerWidth;
+            const yWrong = (wrongPos.y * -.5 + .5) * window.innerHeight;
+            labelWrong.style.left = `${xWrong}px`;
+            labelWrong.style.top = `${yWrong}px`;
+
+            const xCorrect = (correctPos.x * .5 + .5) * window.innerWidth;
+            const yCorrect = (correctPos.y * -.5 + .5) * window.innerHeight;
+            labelCorrect.style.left = `${xCorrect}px`;
+            labelCorrect.style.top = `${yCorrect}px`;
+        }
+
+        // 5. Render Loop
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // ระบบเดินอัตโนมัติ (Sine Wave)
+            if (isAutoAnimate) {
+                const time = clock.getElapsedTime();
+                const swing = Math.sin(time * 3) * 1.0; // ความเร็วและมุมในการแกว่ง
+                updateRotation(swing);
+                rotSlider.value = swing;
+            }
+
+            controls.update();
+            updateLabels();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Responsive Window
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Quick Grade - ตรวจงานด่วน</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>tailwind.config = { theme: { extend: { fontFamily: { sarabun: ['Sarabun','sans-serif'], outfit: ['Outfit','sans-serif'] } } } }</script>
+  
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script>
+    const firebaseConfig = { apiKey: "AIzaSyAHAe6Q4TRjChkJuZ-z7ZT2N23Qm8Aun6U", authDomain: "wkk69-54b7c.firebaseapp.com", projectId: "wkk69-54b7c", storageBucket: "wkk69-54b7c.firebasestorage.app", messagingSenderId: "996097508438", appId: "1:996097508438:web:5bcef61e99ed3e8ba727f7" };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+  </script>
+  <style>
+      body { background: #f8fafc; font-family: 'Sarabun', sans-serif; color: #1e293b; }
+      .glass-box { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+  </style>
+</head>
+<body class="p-4 md:p-8 flex items-center justify-center min-h-screen">
+    
+    <div id="loading" class="text-center">
+        <i data-lucide="loader-2" class="w-10 h-10 animate-spin text-indigo-500 mx-auto mb-4"></i>
+        <p class="text-slate-500 font-bold animate-pulse">กำลังโหลดข้อมูลชิ้นงาน...</p>
+    </div>
+
+    <div id="main-card" class="glass-box rounded-[2rem] w-full max-w-md p-6 sm:p-8 hidden relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
+        <div class="flex items-center gap-3 mb-6">
+            <div class="p-2.5 bg-emerald-50 rounded-xl"><i data-lucide="check-circle" class="w-6 h-6 text-emerald-500"></i></div>
+            <h2 class="text-2xl font-bold font-outfit tracking-tight">Quick Grade</h2>
+        </div>
+
+        <div class="bg-slate-50 rounded-2xl p-5 mb-6 border border-slate-100">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">ข้อมูลนักเรียน</p>
+            <p class="font-bold text-lg text-slate-800" id="stu-name">-</p>
+            <p class="text-sm text-slate-500 mb-4">รหัส: <span id="stu-id" class="font-bold text-indigo-600"></span></p>
+            
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">วิชา / ชิ้นงาน</p>
+            <p class="font-bold text-slate-700" id="sub-title">-</p>
+            <p class="text-xs text-slate-500" id="sub-subject">-</p>
+            
+            <div id="file-links" class="mt-4 pt-4 border-t border-slate-200 flex flex-col gap-2"></div>
+        </div>
+
+        <div class="mb-8">
+            <div class="flex justify-between items-center mb-3">
+                <label class="text-sm font-bold text-slate-700">ให้คะแนนชิ้นงานนี้</label>
+                <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">เต็ม <span id="max-score">10</span></span>
+            </div>
+            <input type="number" id="inp-score" class="w-full text-center text-4xl font-outfit font-bold py-6 rounded-2xl bg-white border-2 border-slate-200 outline-none focus:border-emerald-500 text-emerald-600 transition-all" value="10">
+        </div>
+
+        <button onclick="approveGrade()" id="btn-approve" class="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 transition-all flex justify-center items-center gap-2 text-lg">
+            <i data-lucide="save" class="w-5 h-5"></i> อนุมัติและบันทึก
+        </button>
+    </div>
+
+    <div id="success-card" class="glass-box rounded-[2rem] w-full max-w-md p-8 text-center hidden">
+        <div class="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-emerald-100">
+            <i data-lucide="check" class="w-10 h-10 text-emerald-500"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-slate-800 mb-2 font-outfit">บันทึกสำเร็จ!</h2>
+        <p class="text-slate-500 mb-8">คะแนนถูกอัปเดตลงในสมุดคะแนนเรียบร้อยแล้ว</p>
+        <button onclick="window.close()" class="text-sm font-bold text-indigo-600 bg-indigo-50 px-6 py-3 rounded-xl hover:bg-indigo-100 transition-colors w-full">ปิดหน้าต่างนี้</button>
+    </div>
+
+    <script>
+        let subData = null; let studentData = null; let courseData = null; let targetMax = 10;
+        window.onload = async () => {
+            lucide.createIcons();
+            const urlParams = new URLSearchParams(window.location.search);
+            const subId = urlParams.get('id');
+            if(!subId) return alert('ไม่พบรหัสชิ้นงาน');
+
+            try {
+                // 1. โหลดข้อมูลงาน
+                const subDoc = await db.collection('submissions').doc(subId).get();
+                if(!subDoc.exists) return alert('ไม่พบข้อมูลงานนี้');
+                subData = { id: subDoc.id, ...subDoc.data() };
+
+                // 2. โหลดข้อมูลนักเรียนและวิชา
+                const [stuSnap, courseSnap] = await Promise.all([
+                    db.collection('students').where('student_id', '==', subData.student_id).get(),
+                    db.collection('courses').get()
+                ]);
+                studentData = { id: stuSnap.docs[0].id, ...stuSnap.docs[0].data() };
+                const courses = courseSnap.docs.map(d => d.data());
+                courseData = courses.find(c => c.course_name === subData.subject) || courses[0];
+
+                // 3. หาคะแนนเต็ม
+                try {
+                    const cats = JSON.parse(courseData.score_categories);
+                    const cat = cats.find(c => c.name === subData.title);
+                    if(cat) targetMax = parseFloat(cat.max);
+                } catch(e){}
+
+                // 4. แสดงผล
+                document.getElementById('stu-name').textContent = subData.student_name;
+                document.getElementById('stu-id').textContent = subData.student_id;
+                document.getElementById('sub-title').textContent = subData.title;
+                document.getElementById('sub-subject').textContent = subData.subject;
+                document.getElementById('max-score').textContent = targetMax;
+                document.getElementById('inp-score').value = targetMax;
+                document.getElementById('inp-score').max = targetMax;
+
+                // จัดการไฟล์แนบ
+                let urls = subData.file_url ? String(subData.file_url).split('\n').filter(u => u.trim()!=='') : [];
+                let names = subData.file_name ? String(subData.file_name).split('\n').filter(n => n.trim()!=='') : [];
+                if(urls.length > 0) {
+                    document.getElementById('file-links').innerHTML = urls.map((u, i) => `<a href="${u}" target="_blank" class="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-2 rounded-xl text-xs font-bold border border-indigo-100"><i data-lucide="external-link" class="w-4 h-4"></i> ${names[i] || 'ไฟล์แนบ '+(i+1)}</a>`).join('');
+                } else {
+                    document.getElementById('file-links').innerHTML = '<p class="text-xs text-slate-400 italic">ไม่มีไฟล์แนบ (อาจพิมพ์ส่งมาในหมายเหตุ)</p>';
+                }
+
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('main-card').classList.remove('hidden');
+                lucide.createIcons();
+
+            } catch(e) { alert('โหลดข้อมูลล้มเหลว กรุณาลองใหม่'); }
+        };
+
+        async function approveGrade() {
+            const scoreVal = parseFloat(document.getElementById('inp-score').value);
+            if(isNaN(scoreVal) || scoreVal < 0) return alert('กรุณาใส่คะแนนให้ถูกต้อง');
+
+            const btn = document.getElementById('btn-approve');
+            btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> กำลังบันทึก...'; lucide.createIcons();
+
+            try {
+                // คำนวณเกรดใหม่ (ดึง Logic จากฝั่งครูมา)
+                let oldScores = []; try { oldScores = JSON.parse(studentData.scores || "[]"); } catch(e){}
+                let newScores = []; let newTotal = 0; let totalMax = 0;
+                let expectedCats = []; try { expectedCats = JSON.parse(courseData.score_categories); } catch(e){}
+                
+                expectedCats.forEach(cat => {
+                    totalMax += parseFloat(cat.max) || 0;
+                    if (cat.name === subData.title) {
+                        newTotal += scoreVal; 
+                        newScores.push({ name: cat.name, max: cat.max, score: scoreVal, graded_at: new Date().toISOString() });
+                    } else {
+                        const existing = oldScores.find(s => s.name === cat.name);
+                        if (existing && existing.score !== undefined && existing.score !== null && existing.score !== '') { 
+                            newTotal += existing.score; newScores.push(existing); 
+                        }
+                    }
+                });
+
+                const pct = totalMax > 0 ? (newTotal / totalMax) * 100 : 0;
+                let g4=80, g35=75, g3=70, g25=65, g2=60, g15=55, g1=50; 
+                try { const x = JSON.parse(courseData.grade_criteria); g4=x.g4||80; g35=x.g35||75; g3=x.g3||70; g25=x.g25||65; g2=x.g2||60; g15=x.g15||55; g1=x.g1||50; } catch(e){} 
+                let grade = '0'; if(pct>=g4) grade='4'; else if(pct>=g35) grade='3.5'; else if(pct>=g3) grade='3'; else if(pct>=g25) grade='2.5'; else if(pct>=g2) grade='2'; else if(pct>=g15) grade='1.5'; else if(pct>=g1) grade='1';
+                
+                const payload = { scores: JSON.stringify(newScores), total: Math.round(newTotal*100)/100, percentage: Math.round(pct*100)/100, grade: grade };
+
+                // บันทึกเข้า Firebase
+                await db.collection('students').doc(studentData.id).update(payload);
+                
+                // โชว์หน้าสำเร็จ
+                document.getElementById('main-card').classList.add('hidden');
+                document.getElementById('success-card').classList.remove('hidden');
+                lucide.createIcons();
+
+            } catch(e) {
+                alert('บันทึกไม่สำเร็จ กรุณาลองใหม่');
+                btn.disabled = false; btn.innerHTML = '<i data-lucide="save" class="w-5 h-5"></i> อนุมัติและบันทึก'; lucide.createIcons();
+            }
+        }
+
+        // ==========================================
+// 🌟 ฟังก์ชันปิดหน้าต่างตรวจงาน
+// ==========================================
+window.closeQuickGradeWindow = function() {
+    // 1. โชว์สถานะกำลังโหลดนิดหน่อยให้ดูสมูท
+    const btn = document.getElementById('btn-close-grade') || event.target;
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin inline"></i> กำลังปิด...';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    setTimeout(() => {
+        // 2. ลองสั่งปิดแท็บ (จะได้ผลถ้าเปิดมาจาก Line Notify)
+        window.close();
+        
+        // 3. ถ้าผ่านไป 300ms แล้วแท็บยังไม่ถูกปิด (เบราว์เซอร์บล็อก) ให้เด้งกลับไปหน้า Teacher
+        setTimeout(() => {
+            window.location.href = 'teacher.html';
+        }, 300);
+    }, 200);
+};
+
+
+    </script>
+</body>
+</html>

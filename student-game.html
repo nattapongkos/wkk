@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="th" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Learning World - RPG Adventure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyAHAe6Q4TRjChkJuZ-z7ZT2N23Qm8Aun6U",
+        authDomain: "wkk69-54b7c.firebaseapp.com",
+        projectId: "wkk69-54b7c",
+        storageBucket: "wkk69-54b7c.firebasestorage.app",
+        messagingSenderId: "996097508438",
+        appId: "1:996097508438:web:5bcef61e99ed3e8ba727f7",
+      };
+      if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+    </script>
+    <style>
+      body {
+        font-family: "Sarabun", sans-serif;
+        overflow: hidden;
+        background-color: #0f172a;
+        margin: 0;
+        touch-action: none;
+      }
+      .panel-25d {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        box-shadow:
+          0 8px 32px 0 rgba(0, 0, 0, 0.3),
+          inset 0 2px 0 0 rgba(255, 255, 255, 0.2);
+        border-radius: 1.5rem;
+      }
+      .btn-25d {
+        transition: all 0.15s;
+        box-shadow: 0 6px 0 0 rgba(15, 23, 42, 0.6);
+        cursor: pointer;
+      }
+      .btn-25d:active {
+        transform: translateY(6px);
+        box-shadow: 0 0 0 0 rgba(15, 23, 42, 0.6);
+      }
+      .btn-touch {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(12px);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        box-shadow:
+          0 8px 0 0 rgba(0, 0, 0, 0.3),
+          inset 0 2px 0 0 rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.1s;
+        user-select: none;
+      }
+      .btn-touch:active {
+        transform: translateY(6px);
+        box-shadow:
+          0 2px 0 0 rgba(0, 0, 0, 0.3),
+          inset 0 2px 0 0 rgba(255, 255, 255, 0.2);
+      }
+      #game-canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        transition: transform 0.1s;
+      }
+      div:where(.swal2-container) div:where(.swal2-popup) {
+        border-radius: 1.5rem;
+        font-family: "Sarabun", sans-serif;
+      }
+
+      .status-bar-bg {
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        overflow: hidden;
+        height: 16px;
+        width: 120px;
+        position: relative;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+      }
+      .hp-fill {
+        background: linear-gradient(90deg, #e11d48, #f43f5e);
+        height: 100%;
+        transition: width 0.3s ease-out;
+        box-shadow: 0 0 10px #f43f5e;
+      }
+      .exp-fill {
+        background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+        height: 100%;
+        transition: width 0.3s ease-out;
+        box-shadow: 0 0 10px #38bdf8;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="game-container"
+      style="position: relative; width: 100vw; height: 100vh; overflow: hidden"
+    >
+      <canvas id="game-canvas"></canvas>
+      <img
+        id="player-gif"
+        src=""
+        alt="Player"
+        class="absolute z-[5] pointer-events-none drop-shadow-2xl"
+        style="
+          display: none;
+          transition: transform 0.1s ease-in-out;
+          object-fit: contain;
+        "
+      />
+    </div>
+
+    <div
+      id="ui-layer"
+      class="absolute top-0 left-0 w-full pointer-events-none p-4 z-20 flex flex-col md:flex-row justify-between items-start gap-4"
+    >
+      <div
+        class="panel-25d p-3 md:p-4 pointer-events-auto flex gap-4 items-center w-full md:w-auto"
+      >
+        <div class="relative shrink-0">
+          <div
+            class="w-14 h-14 bg-indigo-600 rounded-2xl border-2 border-indigo-300 shadow-inner flex flex-col items-center justify-center text-white"
+          >
+            <span
+              class="text-[10px] font-bold uppercase tracking-wider text-indigo-200"
+              >LVL</span
+            >
+            <span
+              id="ui-level"
+              class="text-2xl font-black leading-none drop-shadow-md"
+              >1</span
+            >
+          </div>
+        </div>
+        <div class="flex-1 min-w-[150px]">
+          <h3
+            id="player-name"
+            class="text-white font-black text-sm md:text-base truncate drop-shadow-md"
+          >
+            กำลังโหลด...
+          </h3>
+          <div class="mt-1 space-y-1.5">
+            <div class="flex items-center gap-2">
+              <i data-lucide="heart" class="w-3.5 h-3.5 text-rose-400"></i>
+              <div class="status-bar-bg flex-1">
+                <div id="hp-bar" class="hp-fill" style="width: 100%"></div>
+              </div>
+              <span
+                id="hp-text"
+                class="text-[10px] text-white font-bold w-12 text-right"
+                >100/100</span
+              >
+            </div>
+            <div class="flex items-center gap-2">
+              <i data-lucide="star" class="w-3.5 h-3.5 text-sky-400"></i>
+              <div class="status-bar-bg flex-1">
+                <div id="exp-bar" class="exp-fill" style="width: 0%"></div>
+              </div>
+              <span
+                id="exp-text"
+                class="text-[10px] text-white font-bold w-12 text-right"
+                >0/100</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="flex flex-wrap gap-2 md:gap-3 pointer-events-auto justify-end w-full md:w-auto"
+      >
+        <div class="panel-25d px-4 py-2 flex items-center gap-2 mr-2">
+          <i data-lucide="coins" class="w-5 h-5 text-amber-400"></i>
+          <span
+            id="ui-coins"
+            class="text-amber-400 font-black text-lg drop-shadow-md"
+            >0</span
+          >
+        </div>
+        <button
+          onclick="openBackpack()"
+          class="btn-25d bg-amber-500 hover:bg-amber-400 text-white px-3 py-2 md:px-4 md:py-3 rounded-2xl font-bold flex items-center gap-2 text-sm relative z-30"
+        >
+          <i data-lucide="backpack" class="w-5 h-5"></i>
+          <span class="hidden md:inline">กระเป๋า</span>
+          <span
+            id="ui-potions-badge"
+            class="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-full ml-1 hidden"
+            >0</span
+          >
+        </button>
+        <button
+          id="btn-save-game"
+          onclick="manualSave()"
+          class="btn-25d bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-2 md:px-4 md:py-3 rounded-2xl font-bold flex items-center gap-2 text-sm relative z-30"
+        >
+          <i data-lucide="save" class="w-5 h-5"></i>
+          <span class="hidden md:inline">บันทึก</span>
+        </button>
+        <button
+          onclick="window.location.href = 'index.html'"
+          class="btn-25d bg-slate-600 hover:bg-slate-500 text-white px-3 py-2 md:px-4 md:py-3 rounded-2xl font-bold flex items-center gap-2 text-sm relative z-30"
+        >
+          <i data-lucide="log-out" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="action-overlay"
+      class="fixed top-[20%] md:top-32 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 opacity-0 pointer-events-none scale-90 flex justify-center"
+    >
+      <button
+        id="btn-interact"
+        onclick="handleInteraction()"
+        style="pointer-events: auto !important"
+        class="px-6 py-3 md:px-8 md:py-4 flex items-center gap-3 font-bold rounded-full text-white cursor-pointer transition-all shadow-[0_8px_0_0_rgba(0,0,0,0.5)] active:translate-y-[8px] active:shadow-none pointer-events-auto relative"
+      >
+        <span id="interact-icon-wrapper"></span>
+        <span
+          id="interact-text"
+          class="text-base md:text-lg whitespace-nowrap"
+        ></span>
+      </button>
+    </div>
+
+    <div
+      id="mobile-controls"
+      class="fixed bottom-6 left-0 w-full px-6 flex justify-between items-end z-[30] md:hidden pointer-events-none"
+    >
+      <div class="flex gap-4 pointer-events-auto">
+        <button id="btn-left" class="btn-touch w-16 h-16">
+          <i data-lucide="arrow-left" class="w-8 h-8"></i>
+        </button>
+        <button id="btn-right" class="btn-touch w-16 h-16">
+          <i data-lucide="arrow-right" class="w-8 h-8"></i>
+        </button>
+      </div>
+      <div class="pointer-events-auto">
+        <button
+          id="btn-jump"
+          class="btn-touch w-20 h-20 bg-indigo-500/40 border-indigo-300/50 shadow-[0_8px_0_0_rgba(79,70,229,0.5)]"
+        >
+          <i data-lucide="arrow-up" class="w-10 h-10"></i>
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="fade-overlay"
+      class="fixed inset-0 bg-slate-950 z-[200] opacity-0 pointer-events-none transition-opacity duration-1000 flex flex-col items-center justify-center"
+    >
+      <h1
+        id="map-title-display"
+        class="text-4xl md:text-6xl font-black text-white tracking-widest drop-shadow-[0_0_20px_rgba(255,255,255,0.5)] translate-y-10 opacity-0 transition-all duration-700"
+      ></h1>
+      <div class="mt-4 w-24 h-1 bg-white/20 rounded-full overflow-hidden">
+        <div
+          class="h-full bg-white animate-[pulse_1s_ease-in-out_infinite]"
+        ></div>
+      </div>
+    </div>
+
+    <script src="student-game.js"></script>
+  </body>
+</html>

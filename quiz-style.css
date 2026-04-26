@@ -1,0 +1,33 @@
+* { box-sizing: border-box; font-family: 'Sarabun', 'Outfit', sans-serif; }
+body { background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
+
+/* Animations */
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Choice Radio Buttons (Student) */
+.choice-label {
+    display: flex; align-items: center; gap: 12px; padding: 16px; border: 2px solid #e2e8f0; 
+    border-radius: 16px; cursor: pointer; transition: all 0.2s; background: #fff; font-weight: 500;
+}
+.choice-label:hover { border-color: #cbd5e1; background: #f8fafc; }
+.choice-radio:checked + .choice-label {
+    border-color: #6366f1; background: #eef2ff; color: #4f46e5;
+}
+.choice-radio:checked + .choice-label .choice-letter {
+    background: #6366f1; color: #fff; border-color: #6366f1;
+}
+.choice-letter {
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    border: 2px solid #e2e8f0; border-radius: 10px; font-weight: bold; color: #64748b; transition: all 0.2s;
+}
+
+/* Toast */
+.toast-show { animation: slideUp 0.3s ease-out forwards; }
+.toast-hide { opacity: 0; transform: translateY(10px); transition: all 0.3s; }

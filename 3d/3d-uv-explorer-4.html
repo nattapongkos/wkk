@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จำลองการกาง UV และลงสีพื้นผิว 3 มิติ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>tailwind.config = { theme: { extend: { fontFamily: { sarabun: ['Sarabun','sans-serif'], outfit: ['Outfit','sans-serif'] } } } }</script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0f172a; font-family: 'Sarabun', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        /* ตกแต่ง Color Picker */
+        input[type="color"] {
+            -webkit-appearance: none; border: none; width: 36px; height: 36px;
+            border-radius: 10px; cursor: pointer; padding: 0; overflow: hidden;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: 2px solid #e2e8f0; border-radius: 10px; }
+
+        /* โครงร่าง 2D UV Map */
+        .uv-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 50px);
+            grid-template-rows: repeat(3, 50px);
+            gap: 2px;
+            margin-top: 10px;
+        }
+        .uv-cell {
+            background-color: #cbd5e1; border: 1px solid #94a3b8;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: bold; color: rgba(0,0,0,0.5); text-align: center;
+        }
+        .empty-cell { background: transparent; border: none; }
+        
+        /* วาดหน้าตาบน 2D Map */
+        .uv-face { position: relative; }
+        .uv-eyes {
+            position: absolute; top: 40%; left: 0; width: 100%;
+            display: flex; justify-content: space-around; padding: 0 10px;
+        }
+        .eye { width: 8px; height: 8px; background-color: #000; border-radius: 2px; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="absolute top-4 left-4 bg-white/95 backdrop-blur-md p-6 rounded-[2rem] shadow-2xl border border-slate-200 z-10">
+        <h2 class="text-lg font-bold font-outfit tracking-tighter mb-2 text-slate-800 flex items-center gap-2">
+            <span class="p-2 bg-blue-50 text-blue-500 rounded-xl">🗺️</span> 2D UV Map (แผ่นกาง)
+        </h2>
+        <p class="text-[10px] text-slate-500 mb-4 max-w-[200px] leading-tight">โปรแกรม 3D จะนำภาพ 2 มิตินี้ไปห่อหุ้มรอบกล่อง เหมือนการพับกล่องกระดาษ</p>
+        
+        <div class="uv-grid">
+            <div class="empty-cell"></div>
+            <div class="uv-cell" id="uv-top">บน (Top)</div>
+            <div class="empty-cell"></div>
+            <div class="empty-cell"></div>
+            
+            <div class="uv-cell" id="uv-right">ขวา (Right)</div>
+            <div class="uv-cell uv-face" id="uv-front">
+                หน้า (Front)
+                <div class="uv-eyes">
+                    <div class="eye" id="uv-eye-l"></div>
+                    <div class="eye" id="uv-eye-r"></div>
+                </div>
+            </div>
+            <div class="uv-cell" id="uv-left">ซ้าย (Left)</div>
+            <div class="uv-cell" id="uv-back">หลัง (Back)</div>
+            
+            <div class="empty-cell"></div>
+            <div class="uv-cell" id="uv-bottom">ล่าง (Bottom)</div>
+            <div class="empty-cell"></div>
+            <div class="empty-cell"></div>
+        </div>
+    </div>
+
+    <div class="absolute top-4 right-4 w-72 bg-white/95 backdrop-blur-md p-6 rounded-[2rem] shadow-2xl border border-slate-200 z-10">
+        <h2 class="text-xl font-bold font-outfit tracking-tighter mb-4 text-slate-800 flex items-center gap-2">
+            <span class="p-2 bg-emerald-50 text-emerald-500 rounded-xl">🎨</span> ระบายสี (Texturing)
+        </h2>
+        
+        <div class="space-y-3 mb-4">
+            <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-sm transition-all hover:border-slate-300">
+                <span class="text-sm font-bold text-slate-700">สีผิว (Skin)</span>
+                <input type="color" id="colorSkin" value="#fcd34d">
+            </div>
+            <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-sm transition-all hover:border-slate-300">
+                <span class="text-sm font-bold text-slate-700">สีผม (Hair)</span>
+                <input type="color" id="colorHair" value="#451a03">
+            </div>
+            <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-sm transition-all hover:border-slate-300">
+                <span class="text-sm font-bold text-slate-700">สีตา (Eyes)</span>
+                <input type="color" id="colorEyes" value="#1e3a8a">
+            </div>
+        </div>
+
+        <button onclick="animateSpin()" class="w-full py-3 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all uppercase tracking-widest flex items-center justify-center gap-2">
+            หมุนดูรอบๆ 🔄
+        </button>
+    </div>
+
+    <canvas id="texture-canvas" width="64" height="64" style="display:none;"></canvas>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // 1. ตั้งค่า Scene
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(3, 2, 4);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // แสงสว่าง
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        dirLight.position.set(5, 10, 5);
+        scene.add(dirLight);
+
+        // 2. เตรียมระบบ Texture ด้วย HTML Canvas (เพื่อให้ได้อารมณ์ Pixel Art / Blockbench)
+        const txCanvas = document.getElementById('texture-canvas');
+        const ctx = txCanvas.getContext('2d');
+        const faceTexture = new THREE.CanvasTexture(txCanvas);
+        faceTexture.magFilter = THREE.NearestFilter; // ทำให้ขอบพิกเซลคมชัด (Pixel Art Style)
+
+        // 3. สร้างโมเดลส่วนหัว (Head)
+        const geometry = new THREE.BoxGeometry(2, 2, 2);
+        
+        // กำหนด Material แยก 6 ด้าน: [ขวา, ซ้าย, บน, ล่าง, หน้า, หลัง]
+        const mats = [
+            new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }), // 0: ขวา
+            new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }), // 1: ซ้าย
+            new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }), // 2: บน
+            new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }), // 3: ล่าง
+            new THREE.MeshStandardMaterial({ map: faceTexture, roughness: 0.8 }), // 4: หน้า (ใช้ Canvas Texture)
+            new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 })  // 5: หลัง
+        ];
+        
+        const headMesh = new THREE.Mesh(geometry, mats);
+        scene.add(headMesh);
+
+        // 4. ฟังก์ชันอัปเดตสี ทั้ง 2D UI และ 3D Model
+        function updateColors() {
+            const skinColor = document.getElementById('colorSkin').value;
+            const hairColor = document.getElementById('colorHair').value;
+            const eyesColor = document.getElementById('colorEyes').value;
+
+            // --- อัปเดต 2D UI Map ---
+            document.getElementById('uv-front').style.backgroundColor = skinColor;
+            document.getElementById('uv-right').style.backgroundColor = skinColor;
+            document.getElementById('uv-left').style.backgroundColor = skinColor;
+            document.getElementById('uv-bottom').style.backgroundColor = skinColor;
+            
+            document.getElementById('uv-top').style.backgroundColor = hairColor;
+            document.getElementById('uv-back').style.backgroundColor = hairColor;
+
+            document.getElementById('uv-eye-l').style.backgroundColor = eyesColor;
+            document.getElementById('uv-eye-r').style.backgroundColor = eyesColor;
+
+            // --- อัปเดต 3D Materials ---
+            mats[0].color.set(skinColor); // ขวา
+            mats[1].color.set(skinColor); // ซ้าย
+            mats[2].color.set(hairColor); // บน (ผม)
+            mats[3].color.set(skinColor); // ล่าง (คอ)
+            mats[5].color.set(hairColor); // หลัง (ผม)
+
+            // --- อัปเดต Canvas Texture สำหรับใบหน้า (ด้านหน้า) ---
+            ctx.fillStyle = skinColor;
+            ctx.fillRect(0, 0, 64, 64); // พื้นหลังหน้า
+            
+            ctx.fillStyle = eyesColor;
+            ctx.fillRect(12, 24, 12, 12); // ตาซ้าย
+            ctx.fillRect(40, 24, 12, 12); // ตาขวา
+            
+            // วาดปากนิดหน่อยให้ดูเป็นตัวละคร
+            ctx.fillStyle = "rgba(0,0,0,0.3)";
+            ctx.fillRect(24, 44, 16, 4);
+
+            faceTexture.needsUpdate = true; // สั่งให้ Three.js อัปเดตพื้นผิว
+        }
+
+        // จับเหตุการณ์เมื่อเปลี่ยนสี
+        document.getElementById('colorSkin').addEventListener('input', updateColors);
+        document.getElementById('colorHair').addEventListener('input', updateColors);
+        document.getElementById('colorEyes').addEventListener('input', updateColors);
+
+        // เรียกใช้ครั้งแรกเพื่อตั้งค่าเริ่มต้น
+        updateColors();
+
+        // 5. อนิเมชันหมุนดูรอบๆ
+        let isAutoSpinning = false;
+        function animateSpin() {
+            isAutoSpinning = true;
+            setTimeout(() => { isAutoSpinning = false; }, 3000); // หมุน 3 วินาทีแล้วหยุด
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (isAutoSpinning) {
+                headMesh.rotation.y += 0.05;
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Responsive
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
