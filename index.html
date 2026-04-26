@@ -6,13 +6,13 @@
     <title>Student Portal - ศูนย์รวมการเรียนรู้</title>
 
     <!-- 📱 PWA -->
-    <link rel="manifest" href="/69/manifest.json" />
+    <link rel="manifest" href="./manifest.json" />
     <meta name="theme-color" content="#4f46e5" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Student Portal" />
-    <link rel="apple-touch-icon" href="/69/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
@@ -3529,7 +3529,7 @@
     // =====================================================
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/69/service-worker.js')
+        navigator.serviceWorker.register('./service-worker.js')
           .then((reg) => {
             console.log('[PWA] Service Worker registered:', reg.scope);
 

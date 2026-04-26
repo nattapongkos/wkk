@@ -2,14 +2,14 @@
 // 🔧 Student Portal — Service Worker (PWA)
 // เพิ่ม version เมื่อแก้ไขไฟล์ เพื่อให้ cache อัปเดต
 // =====================================================
-const CACHE_NAME = "student-portal-v3";
+const CACHE_NAME = "student-portal-v4";
 
 // 🟢 เปลี่ยน /wkk-learning/ เป็น /69/ ทั้งหมด
 const STATIC_ASSETS = [
-  "/69/index.html",
-  "/69/submit-script.js",
-  "/69/submit-style.css",
-  "/69/manifest.json",
+  "./index.html",
+  "./submit-script.js",
+  "./submit-style.css",
+  "./manifest.json",
   "https://cdn.tailwindcss.com",
   "https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js",
   "https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap",
@@ -97,7 +97,7 @@ self.addEventListener("fetch", (event) => {
           }
           // 🟢 ถ้าออฟไลน์ ให้เปิดหน้า index.html จากโฟลเดอร์ /69/
           if (event.request.destination === "document") {
-            return caches.match("/69/index.html"); 
+           return caches.match("./index.html");
           }
           
           // 🟢 ดัก Error: Failed to convert value to 'Response'
