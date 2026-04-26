@@ -1,13 +1,13 @@
 // =====================================================
 // 🔧 Student Portal — Service Worker (PWA)
 // =====================================================
-const CACHE_NAME = "student-portal-v5";
+const CACHE_NAME = "student-portal-v6";
 
 const STATIC_ASSETS = [
-  "/69/index.html",
-  "/69/submit-script.js",
-  "/69/submit-style.css",
-  "/69/manifest.json",
+  "./index.html",
+  "./submit-script.js",
+  "./submit-style.css",
+  "./manifest.json",
   "https://cdn.tailwindcss.com",
   "https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js",
   "https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap"
@@ -80,7 +80,7 @@ self.addEventListener("fetch", (event) => {
             return cachedResponse;
           }
           if (event.request.destination === "document") {
-            return caches.match("/69/index.html"); 
+            return caches.match("./index.html"); 
           }
           return new Response('', { status: 404, statusText: 'Not Found' });
         });

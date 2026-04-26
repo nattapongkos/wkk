@@ -3502,7 +3502,7 @@
 
 
 
-<script src="daily-quest.js"></script>
+
 
 <style>
     @keyframes bounce-slow {
@@ -3524,22 +3524,20 @@
     <script src="treasure-student.js?v=106"></script>
     <script src="daily-quest.js"></script>
     <script>
-    // =====================================================
-    // 📱 Register Service Worker (PWA)
-    // =====================================================
-    if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // 🟢 แก้ไข: ระบุ Path ชี้ไปที่โฟลเดอร์ /69/ และกำหนด Scope ให้ชัดเจน
-    navigator.serviceWorker.register('./service-worker.js', { scope: '/69/' })
+    // 🟢 แก้ไข: ระบุ Path เต็มไปที่ /69/ เพื่อให้เบราว์เซอร์หาไฟล์เจอแน่นอน
+    // และใส่ Scope ครอบคลุมโฟลเดอร์ /69/ ทั้งหมด
+    navigator.serviceWorker.register('/69/service-worker.js', { scope: '/69/' })
       .then((reg) => {
         console.log('[PWA] Service Worker registered:', reg.scope);
 
-        // ถ้ามี SW ใหม่รอ activate → แจ้งผู้ใช้รีเฟรชเพื่ออัปเดต
+        // ตรวจสอบการอัปเดต Service Worker
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // แสดง toast แจ้งมีอัปเดต
+              // แจ้งเตือนเมื่อมีเวอร์ชันใหม่ (เรียกใช้ฟังก์ชัน showToast ที่คุณมีอยู่)
               if (typeof showToast === 'function') {
                 showToast('มีการอัปเดตระบบ — กดรีเฟรชเพื่อใช้เวอร์ชันใหม่ 🔄', 'info');
               }
@@ -3547,10 +3545,12 @@
           });
         });
       })
-      .catch((err) => console.warn('[PWA] SW registration failed:', err));
+      .catch((err) => {
+        console.warn('[PWA] SW registration failed:', err);
+      });
   });
 }
-    </script>
+</script>
     <script>
     // ==========================================
     // 🔢 ระบบ PIN Box — กรอกทีละช่อง
