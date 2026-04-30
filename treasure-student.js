@@ -128,69 +128,197 @@ async function trs_loadData() {
     trs_renderUI();
 }
 
+// ==========================================
+// 🌟 1.5 ตัวแปรเก็บสถานะการเลือกภารกิจ
+// ==========================================
+window.trs_currentSelectedQuestId = null;
+
+window.trs_selectQuest = function(questId) {
+    window.trs_currentSelectedQuestId = questId;
+    trs_renderUI();
+};
+
+// ==========================================
+// 🌟 2. ระบบวาด UI ล่าสมบัติ (Master-Detail 2.5D Layout)
+// ==========================================
 function trs_renderUI() {
-    const activeContainer = document.getElementById('active-quests'); 
+    const container = document.getElementById('active-quests'); 
     const completedContainer = document.getElementById('completed-quests');
-    if(!activeContainer || !completedContainer) return;
     
-    let activeHTML = ''; let completedHTML = '';
+    // ซ่อนกล่อง "สมบัติในกระเป๋า" ด้านล่างทิ้งไปเลย เพราะเรารวมไว้ใน UI ใหม่แล้ว
+    if (completedContainer && completedContainer.parentElement) {
+        completedContainer.parentElement.style.display = 'none'; 
+    }
+
+    if (!container) return;
 
     if (trs_quests.length === 0) {
-        activeContainer.innerHTML = '<div class="text-center py-6 text-slate-400 text-sm">ยังไม่มีภารกิจล่าสมบัติในขณะนี้ครับ</div>';
-        completedContainer.innerHTML = '<div class="col-span-full text-center py-6 text-slate-400 text-sm">ยังไม่มีสมบัติในกระเป๋า ออกไปตามหาเลย!</div>';
+        container.className = "bg-white p-6 rounded-2xl border border-slate-200 w-full";
+        container.innerHTML = '<div class="text-center py-10 text-slate-400 font-bold"><i data-lucide="map-x" class="w-12 h-12 mx-auto mb-3 opacity-50"></i>ยังไม่มีภารกิจล่าสมบัติในขณะนี้ครับ</div>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
         return;
     }
 
+    // กำหนดค่าเริ่มต้นถ้ายังไม่ได้เลือกภารกิจไหนเลย
+    if (!window.trs_currentSelectedQuestId || !trs_quests.find(q => q.id === window.trs_currentSelectedQuestId)) {
+        window.trs_currentSelectedQuestId = trs_quests[0].id;
+    }
+
+    const selectedQuest = trs_quests.find(q => q.id === window.trs_currentSelectedQuestId);
+    const mySelectedData = trs_myTreasures.find(t => t.quest_id === selectedQuest.id);
+    const collectedPieces = mySelectedData ? mySelectedData.collected_pieces : [];
+    const isCompleted = mySelectedData ? mySelectedData.is_completed : false;
+
+    // -------------------------------------------------------------
+    // 🗂️ ส่วนที่ 1: แถบเมนูด้านซ้าย (Left Master Menu)
+    // -------------------------------------------------------------
+    let menuHtml = `<div class="w-full md:w-[35%] bg-gradient-to-b from-indigo-500 to-purple-600 p-4 md:p-6 flex flex-row md:flex-col gap-3 md:gap-4 overflow-x-auto md:overflow-y-auto custom-scrollbar shrink-0 z-0">`;
+    
     trs_quests.forEach(quest => {
+        const isActive = quest.id === window.trs_currentSelectedQuestId;
         const myData = trs_myTreasures.find(t => t.quest_id === quest.id);
-        const collectedPieces = myData ? myData.collected_pieces : [];
-        const isCompleted = myData ? myData.is_completed : false;
+        const isDone = myData ? myData.is_completed : false;
+        
+        // CSS สร้างมิติเวลาถูกเลือก (นูนออกมาและสว่างขึ้น)
+        const activeClass = isActive 
+            ? "bg-white/20 border-white/50 shadow-lg md:translate-x-3 translate-y-0" 
+            : "border-transparent hover:bg-white/10 hover:translate-x-1";
+            
+        const ringClass = isActive 
+            ? "ring-4 ring-white shadow-[0_0_15px_rgba(255,255,255,0.5)]" 
+            : "ring-2 ring-white/30";
+        
+        let coverImg = quest.cover_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(quest.title)}&background=random`;
 
-        if (isCompleted) {
-            let coverBg = quest.cover_url ? `background-image: url('${quest.cover_url}'); background-size: cover; background-position: center;` : `background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);`;
-            completedHTML += `<div class="relative rounded-[2rem] overflow-hidden shadow-[0_10px_20px_rgba(0,0,0,0.1)] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] hover:-translate-y-2 transition-all duration-500 cursor-pointer group aspect-[4/5] border-2 border-amber-300/50 hover:border-amber-400 bg-slate-900"><div class="absolute inset-0 transition-transform duration-700 group-hover:scale-110 opacity-90" style="${coverBg}"></div><div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent opacity-90 group-hover:opacity-80 transition-opacity duration-500"></div><div class="absolute inset-0 overflow-hidden rounded-[2rem] z-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"><div class="absolute top-0 left-[-150%] w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 animate-legendary-shine"></div></div><div class="absolute inset-0 p-4 flex flex-col items-center justify-end text-center z-10 pb-5"><div class="absolute top-3 right-3 bg-black/40 backdrop-blur-md rounded-full p-2 border border-white/10 shadow-sm group-hover:rotate-12 transition-transform"><i data-lucide="gem" class="w-4 h-4 text-amber-300"></i></div>${!quest.cover_url ? `<div class="w-14 h-14 bg-gradient-to-br from-yellow-300 to-amber-500 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.6)] mb-auto mt-6 border-2 border-white/80 group-hover:scale-110 transition-transform duration-500"><i data-lucide="crown" class="w-7 h-7 text-white drop-shadow-md"></i></div>` : `<div class="mt-auto"></div>`}<div class="w-full transform group-hover:-translate-y-1 transition-transform duration-500"><h3 class="font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-amber-300 to-yellow-500 text-lg leading-tight line-clamp-2 drop-shadow-[0_4px_4px_rgba(0,0,0,0.9)] mb-3">${quest.title}</h3><div class="inline-flex items-center gap-1.5 text-[9px] font-black text-amber-950 bg-gradient-to-r from-yellow-300 to-amber-500 px-3 py-1.5 rounded-full uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.5)] border border-yellow-200/50"><i data-lucide="sparkles" class="w-3 h-3"></i> สมบัติระดับตำนาน</div></div></div></div>`;
-        } else {
-    const pct = Math.round((collectedPieces.length / quest.total_pieces) * 100);
-    let coverHtml = '';
-    
-    if (quest.cover_url) { 
-        coverHtml = `<div class="flex gap-4 items-center mb-4"><div class="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-[1rem] overflow-hidden shadow-sm border border-slate-100 relative"><img src="${quest.cover_url}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-slate-900/5 mix-blend-overlay"></div></div><div class="flex-1 min-w-0"><h3 class="font-bold text-slate-800 text-lg sm:text-xl leading-tight line-clamp-2 mb-2">${quest.title}</h3><span class="inline-flex text-[10px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">สะสม ${collectedPieces.length}/${quest.total_pieces} ชิ้น</span></div></div>`; 
-    } else { 
-        coverHtml = `<div class="flex justify-between items-center mb-4"><h3 class="font-bold text-slate-800 text-lg sm:text-xl truncate pr-2">${quest.title}</h3><span class="text-[10px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100 shrink-0">สะสม ${collectedPieces.length}/${quest.total_pieces} ชิ้น</span></div>`; 
-    }
-    
-    let galleryHtml = '<div class="flex gap-3 mt-4 overflow-x-auto custom-scrollbar pb-3">';
-    
-    for(let i = 1; i <= quest.total_pieces; i++) { 
-        let isFound = collectedPieces.includes(i); 
-        let defaultImg = `https://ui-avatars.com/api/?name=${i}&background=fef3c7&color=d97706&size=128&font-size=0.5`; 
-        
-        // 🟢 เปลี่ยนวิธีดึงรูปตรงนี้ ให้รองรับ Data โครงสร้างใหม่
-        let imgUrl = defaultImg;
-        if (quest.piece_images && quest.piece_images[i-1]) {
-            let piece = quest.piece_images[i-1];
-            imgUrl = (typeof piece === 'object') ? (piece.url || defaultImg) : piece;
-        }
-        
-        if(isFound) { 
-            galleryHtml += `<div class="w-14 h-14 shrink-0 rounded-[14px] overflow-hidden border-[3px] border-amber-400 shadow-md relative group"><img src="${imgUrl}" class="w-full h-full object-cover group-hover:scale-110 transition-transform"><div class="absolute inset-0 bg-amber-500/20 mix-blend-overlay"></div></div>`; 
-        } else { 
-            galleryHtml += `<div class="w-14 h-14 shrink-0 rounded-[14px] bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center shadow-inner"><i data-lucide="lock" class="w-5 h-5 text-slate-300"></i></div>`; 
-        } 
-    } 
-    galleryHtml += '</div>';
-    
-    let actionBtn = ''; 
-    if (collectedPieces.length === quest.total_pieces) { 
-        actionBtn = `<button onclick="combineTreasure('${quest.id}', '${quest.title}')" class="w-full mt-4 bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-orange-200 animate-pulse flex items-center justify-center gap-2 uppercase tracking-widest"><i data-lucide="sparkles" class="w-4 h-4"></i> รวมชิ้นส่วนเป็นสมบัติ!</button>`; 
-    }
-    
-    activeHTML += `<div class="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-sm relative group hover:border-amber-300 transition-colors">${coverHtml}<div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden shadow-inner mt-2 mb-2"><div class="bg-gradient-to-r from-amber-400 to-orange-500 h-full rounded-full transition-all duration-700" style="width: ${pct}%"></div></div>${galleryHtml}${actionBtn}</div>`;
-}
+        menuHtml += `
+        <div onclick="trs_selectQuest('${quest.id}')" class="flex items-center gap-3 md:gap-4 p-2.5 md:p-3 rounded-2xl cursor-pointer transition-all duration-300 border ${activeClass} group min-w-[160px] md:min-w-0">
+            <div class="relative shrink-0">
+                <img src="${coverImg}" class="w-10 h-10 md:w-14 md:h-14 rounded-full object-cover ${ringClass} transition-all duration-300 group-hover:scale-110 bg-white">
+                ${isDone ? `<div class="absolute -bottom-1 -right-1 bg-amber-400 rounded-full p-0.5 border-2 border-indigo-600"><i data-lucide="check" class="w-3 h-3 text-white"></i></div>` : ''}
+            </div>
+            <div class="flex-1 min-w-0">
+                <h4 class="text-white font-bold text-sm md:text-base truncate drop-shadow-sm">${quest.title}</h4>
+                <p class="text-indigo-200 text-[10px] md:text-xs font-medium truncate">${isDone ? '✨ สะสมสมบัติสำเร็จแล้ว' : '🔍 กำลังค้นหาชิ้นส่วน...'}</p>
+            </div>
+        </div>`;
     });
+    menuHtml += `</div>`;
 
-    activeContainer.innerHTML = activeHTML || '<div class="text-center py-6 text-slate-400 text-sm">ไม่มีภารกิจใหม่ในขณะนี้</div>';
-    completedContainer.innerHTML = completedHTML || '<div class="col-span-full text-center py-6 text-slate-400 text-sm">ยังไม่มีสมบัติในกระเป๋า ออกไปตามหาเลย!</div>';
+    // -------------------------------------------------------------
+    // 📄 ส่วนที่ 2: แผงรายละเอียดด้านขวา (Right Content Panel)
+    // -------------------------------------------------------------
+    // สังเกต md:-ml-6 คือการทำ CSS Overlap ให้ขอบขาวเกยทับขอบม่วงแบบในรูปครับ
+    let contentHtml = `<div class="w-full md:w-[65%] bg-white md:-ml-6 md:my-4 md:rounded-[2rem] rounded-b-[2rem] md:rounded-b-[2rem] shadow-[-15px_0_30px_rgba(0,0,0,0.15)] p-6 md:p-8 relative overflow-hidden flex flex-col z-10 min-h-[420px]">`;
+
+    // ภาพพื้นหลังตกแต่งลายเส้น
+    contentHtml += `
+        <div class="absolute -top-10 -right-10 w-48 h-48 bg-amber-100 rounded-full blur-[50px] opacity-60 pointer-events-none"></div>
+        <div class="absolute top-10 right-10 opacity-10 pointer-events-none transform rotate-12"><i data-lucide="map" class="w-32 h-32 text-indigo-500"></i></div>
+    `;
+
+    if (isCompleted) {
+        // --- สถานะ: ภารกิจสำเร็จแล้ว ---
+        contentHtml += `
+            <div class="inline-flex items-center gap-1.5 text-[10px] font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full uppercase tracking-widest border border-amber-200 w-fit mb-4 relative z-10 shadow-sm">
+                <i data-lucide="award" class="w-3.5 h-3.5"></i> ภารกิจสำเร็จระดับตำนาน
+            </div>
+            <h2 class="text-3xl md:text-4xl font-black text-indigo-800 font-outfit tracking-tight mb-4 drop-shadow-sm relative z-10 pr-10">${selectedQuest.title}</h2>
+            <p class="text-sm text-slate-500 mb-8 leading-relaxed max-w-[90%] relative z-10">${selectedQuest.desc || 'คุณได้ครอบครองสมบัติชิ้นนี้ไปเรียบร้อยแล้ว ถูกบันทึกไว้ในคลังสมบัติของคุณ!'}</p>
+            
+            <div class="mt-auto flex flex-col items-center justify-center p-8 bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-3xl border border-amber-200 shadow-inner text-center relative z-10">
+                <div class="w-24 h-24 bg-gradient-to-br from-yellow-300 to-amber-500 rounded-full flex items-center justify-center mb-4 shadow-[0_10px_25px_rgba(245,158,11,0.5)] animate-bounce">
+                    <i data-lucide="crown" class="w-12 h-12 text-white"></i>
+                </div>
+                <h4 class="font-black text-amber-700 text-xl tracking-wide">สมบัตินี้เป็นของคุณ!</h4>
+            </div>
+        `;
+    } else {
+        // --- สถานะ: กำลังล่าสมบัติ ---
+        const pct = Math.round((collectedPieces.length / selectedQuest.total_pieces) * 100);
+        const rating = (Math.random() * (5.0 - 4.2) + 4.2).toFixed(1); // สุ่มเรตติ้งปลอมๆ ให้เหมือนในรูป
+        
+        contentHtml += `
+            <div class="inline-flex items-center gap-1.5 text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1.5 rounded-full uppercase tracking-widest border border-indigo-200 w-fit mb-4 relative z-10 shadow-sm">
+                <i data-lucide="star" class="w-3 h-3 fill-indigo-500"></i> เรตติ้ง ${rating}
+            </div>
+            <h2 class="text-3xl md:text-4xl font-black text-indigo-800 font-outfit tracking-tight mb-3 drop-shadow-sm relative z-10 pr-10">${selectedQuest.title}</h2>
+            <p class="text-sm text-slate-500 mb-6 leading-relaxed max-w-[90%] min-h-[40px] relative z-10">${selectedQuest.desc || 'ตามหาชิ้นส่วนที่หายไปให้ครบเพื่อรวมเป็นสมบัติและรับรางวัล!'}</p>
+            
+            <div class="mb-6 relative z-10">
+                <div class="flex justify-between items-end mb-2 px-1">
+                    <span class="text-xs font-bold text-slate-700">ความคืบหน้า</span>
+                    <span class="text-[10px] font-black text-amber-600 bg-amber-100 px-2.5 py-1 rounded-md border border-amber-200 shadow-sm">สะสม ${collectedPieces.length}/${selectedQuest.total_pieces}</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner border border-slate-200">
+                    <div class="bg-gradient-to-r from-amber-400 to-orange-500 h-full rounded-full transition-all duration-700 relative overflow-hidden" style="width: ${pct}%">
+                        <div class="absolute top-0 left-[-100%] w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shine_2s_infinite]"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // วาด Gallery ชิ้นส่วน 
+        let galleryHtml = '<div class="flex flex-wrap gap-3 mt-2 overflow-y-auto max-h-[140px] custom-scrollbar p-1 relative z-10">';
+        for(let i = 1; i <= selectedQuest.total_pieces; i++) { 
+            let isFound = collectedPieces.includes(i); 
+            let defaultImg = `https://ui-avatars.com/api/?name=${i}&background=fef3c7&color=d97706&size=128&font-size=0.5`; 
+            
+            let imgUrl = defaultImg;
+            if (selectedQuest.piece_images && selectedQuest.piece_images[i-1]) {
+                let piece = selectedQuest.piece_images[i-1];
+                imgUrl = (typeof piece === 'object') ? (piece.url || defaultImg) : piece;
+            }
+            
+            if(isFound) { 
+                galleryHtml += `<div class="w-14 h-14 shrink-0 rounded-[14px] overflow-hidden border-2 border-amber-400 shadow-md relative group"><img src="${imgUrl}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"><div class="absolute inset-0 bg-amber-500/10 mix-blend-overlay"></div></div>`; 
+            } else { 
+                galleryHtml += `<div class="w-14 h-14 shrink-0 rounded-[14px] bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center shadow-inner"><i data-lucide="lock" class="w-5 h-5 text-slate-300"></i></div>`; 
+            } 
+        } 
+        galleryHtml += '</div>';
+
+        contentHtml += galleryHtml;
+
+        // ปุ่ม Action ด้านล่าง (รวมสมบัติ หรือ ค้นหา)
+        if (collectedPieces.length === selectedQuest.total_pieces) { 
+            contentHtml += `
+                <div class="mt-auto pt-6 relative z-10">
+                    <button onclick="combineTreasure('${selectedQuest.id}', '${selectedQuest.title.replace(/'/g, "\\'")}')" class="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white font-black py-4 rounded-2xl shadow-[0_8px_20px_rgba(245,158,11,0.4)] hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2 uppercase tracking-widest text-sm border border-amber-300 animate-pulse">
+                        <i data-lucide="sparkles" class="w-5 h-5"></i> รวมชิ้นส่วนเป็นสมบัติ!
+                    </button>
+                </div>`; 
+        } else {
+            contentHtml += `
+                <div class="mt-auto pt-6 grid grid-cols-2 gap-3 relative z-10">
+                    <button onclick="openGeoQuestMap()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold py-3.5 sm:py-4 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 text-[11px] sm:text-xs uppercase tracking-widest shadow-sm hover:-translate-y-0.5">
+                        <i data-lucide="radar" class="w-4 h-4"></i> ค้นหาพิกัด
+                    </button>
+                    <button onclick="startScanner()" class="bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 text-white font-bold py-3.5 sm:py-4 rounded-2xl shadow-md transition-all duration-300 flex items-center justify-center gap-2 text-[11px] sm:text-xs uppercase tracking-widest hover:-translate-y-0.5">
+                        <i data-lucide="scan-line" class="w-4 h-4 text-white"></i> สแกน QR
+                    </button>
+                </div>`;
+        }
+    }
+    contentHtml += `</div>`; 
+
+    // -------------------------------------------------------------
+    // 🌟 นำมารวมกัน แล้วใส่คลาส CSS เพื่อเปลี่ยนกรอบใหม่ทั้งหมด
+    // -------------------------------------------------------------
+    // override คลาสเก่าของ #active-quests ทั้งหมด เพื่อเคลียร์ขอบและตั้งค่า layout ซ้ายขวา
+    container.className = "flex flex-col md:flex-row w-full max-w-5xl mx-auto rounded-[2rem] bg-indigo-500 shadow-2xl overflow-hidden relative border-[6px] border-white/80 backdrop-blur-sm";
+    
+    // ยัด HTML เข้าไป
+    container.innerHTML = menuHtml + contentHtml;
+    
+    // เพิ่มอนิเมชันให้แถบหลอดพลัง (Shine Effect)
+    if (!document.getElementById('shine-style-trs')) {
+        const style = document.createElement('style');
+        style.id = 'shine-style-trs';
+        style.innerHTML = `@keyframes shine { 0% { left: -100%; } 20% { left: 100%; } 100% { left: 100%; } }`;
+        document.head.appendChild(style);
+    }
+    
+    // เรียกใช้ไอคอน
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
@@ -421,27 +549,64 @@ async function trs_onSuccess(decodedText, decodedResult) {
 }
 
 window.combineTreasure = async function(questId, questTitle) {
+    if (!trs_user || !trs_user.id) return;
+    
     // 🌟 ตอนกดรวมร่างสมบัติ ก็เรียกใช้หน้าจอโหลดเทพๆ นี้ด้วย!
     await playLegendaryLoading();
 
     try {
-        await fetch(TRS_GAS_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'complete_quest', student_id: String(trs_user.id), quest_id: questId })
-        });
+        // 1. ตรวจสอบก่อนว่าเคยได้สมบัตินี้ไปแล้วหรือยัง (ป้องกันเด็กกดซ้ำ)
+        const { data: existingData, error: checkError } = await supabase1
+            .from('student_treasures')
+            .select('*')
+            .eq('student_id', String(trs_user.id))
+            .eq('quest_id', questId);
+            
+        if (checkError) throw checkError;
 
+        if (existingData && existingData.length > 0) {
+            closeLegendaryLoading();
+            return trs_showAlert("มีอยู่แล้ว!", "คุณมีสมบัตินี้ในครอบครองอยู่แล้ว!", "warning");
+        }
+
+        // 2. ถ้ายังไม่มี บันทึกลง Supabase
+        const { data, error } = await supabase1
+            .from('student_treasures')
+            .insert([
+                { 
+                  student_id: String(trs_user.id), 
+                  quest_id: questId 
+                }
+            ]);
+
+        if (error) throw error;
+
+        // อัปเดต UI ท้องถิ่นว่ารวมสมบัติสำเร็จแล้ว
         const myData = trs_myTreasures.find(t => t.quest_id === questId);
         if (myData) myData.is_completed = true;
         trs_renderUI();
         
         closeLegendaryLoading();
         
+        // โชว์หน้าต่างยินดีด้วย! 
         document.getElementById('success-quest-name').textContent = questTitle;
-        const modal = document.getElementById('success-modal'); const box = document.getElementById('success-box');
+        const modal = document.getElementById('success-modal'); 
+        const box = document.getElementById('success-box');
         if(modal && box) {
-            modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); box.classList.replace('scale-50', 'scale-100'); }, 10);
+            modal.classList.remove('hidden'); 
+            setTimeout(() => { 
+                modal.classList.remove('opacity-0'); 
+                box.classList.replace('scale-50', 'scale-100'); 
+            }, 10);
         }
+
+        // โหลดข้อมูลกระดานทำเนียบใหม่ให้หน้าแรกอัปเดตทันที
+        if (typeof loadTreasureShowcase === "function") {
+            loadTreasureShowcase();
+        }
+
     } catch (e) { 
+        console.error("Error combining treasure:", e);
         closeLegendaryLoading();
         trs_showAlert('เกิดข้อผิดพลาด', 'รวมร่างสมบัติล้มเหลว', 'error'); 
     }

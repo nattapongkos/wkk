@@ -21,49 +21,26 @@ function fileToBase64(file) {
   });
 }
 
-// ✨ อัปเกรดฟังก์ชันสแกนรูป ให้มีระบบบีบอัด (Compression)
 async function processImagesInContent(html) {
-  const GAS_URL = localStorage.getItem("gasUrl");
-  if (!GAS_URL) return html;
-
   const div = document.createElement("div");
   div.innerHTML = html;
   const images = div.querySelectorAll("img");
 
   for (let img of images) {
+    // จัดการเฉพาะรูปที่เป็น Base64 (data:image/...)
     if (img.src.startsWith("data:image/")) {
       try {
-        const originalBase64 = img.src;
         const name = `article_img_${Date.now()}.jpg`;
+        const imageFile = base64ToFile(img.src, name);
 
-        const imageFile = base64ToFile(originalBase64, name);
-
-        const options = {
-          maxSizeMB: 0.5,
-          maxWidthOrHeight: 1200,
-          useWebWorker: true,
-        };
-
+        const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1200, useWebWorker: true };
         const compressedFile = await imageCompression(imageFile, options);
 
-        const compressedBase64 = await fileToBase64(compressedFile);
-        const type = compressedFile.type;
-
-        const res = await fetch(GAS_URL, {
-          method: "POST",
-          body: JSON.stringify({
-            action: "upload_material_image",
-            data: { name, type, base64: compressedBase64 },
-          }),
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-        });
-        const json = await res.json();
-
-        if (json.status === "success") {
-          img.src = json.file.url;
-        }
+        // 🚀 อัปโหลดรูปในบทความเข้า Supabase
+        const fileData = await uploadToSupabase(compressedFile, `Article`);
+        img.src = fileData.url;
       } catch (e) {
-        console.error("Image upload or compression failed:", e);
+        console.error("Image upload failed:", e);
       }
     }
   }
@@ -602,6 +579,9 @@ function closeModal() {
   }, 300);
 }
 
+// ========================================================
+// 💾 ฟังก์ชันบันทึกสื่อการสอน (ย้ายไป Supabase)
+// ========================================================
 async function saveMaterial() {
   const course_id = document.getElementById("inp-m-course").value;
   const title = document.getElementById("inp-m-title").value.trim();
@@ -616,10 +596,10 @@ async function saveMaterial() {
       document.querySelectorAll('.grade-item-checkbox:checked').forEach(chk => {
           target_grade.push(chk.value);
       });
-      if (target_grade.length === 0) target_grade = ["all"]; // กันกรณีครูเผลอติ๊กออกหมด
+      if (target_grade.length === 0) target_grade = ["all"]; 
   }
+  
   const selected_type = document.getElementById("material-type").value;
-
   const orderRaw = document.getElementById("inp-m-order").value;
   const order = orderRaw !== "" ? Number(orderRaw) : 999;
 
@@ -639,10 +619,7 @@ async function saveMaterial() {
     });
 
     if (questionsList.length === 0) {
-      return showToast(
-        "กรุณาเพิ่มข้อคำถามอย่างน้อย 1 ข้อ สำหรับใบงาน",
-        "error",
-      );
+      return showToast("กรุณาเพิ่มข้อคำถามอย่างน้อย 1 ข้อ สำหรับใบงาน", "error");
     }
   }
 
@@ -653,70 +630,51 @@ async function saveMaterial() {
   const youtube_url = document.getElementById("inp-m-youtube").value.trim();
   const link_url = document.getElementById("inp-m-link").value.trim();
   const album_url = document.getElementById("inp-m-album").value.trim();
+  
   let contentHtml = quill.root.innerHTML;
   if (quill.getText().trim().length === 0 && !contentHtml.includes("<img"))
     contentHtml = "";
 
+  // 🚀 จัดการอัปโหลดรูปภาพที่แทรกในบทความเข้า Supabase
   if (contentHtml.includes("data:image/")) {
-    btn.innerHTML =
-      '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> กำลังอัปโหลดรูป...';
+    btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> กำลังอัปโหลดรูป...';
     lucide.createIcons();
     contentHtml = await processImagesInContent(contentHtml);
   }
 
-  btn.innerHTML =
-    '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> กำลังบันทึก...';
+  btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> กำลังบันทึก...';
   lucide.createIcons();
 
-  let oldMaterial = editingMaterialId
-    ? materials.find((x) => x.id === editingMaterialId)
-    : null;
-  let file_url = oldMaterial
-    ? oldMaterial.file_url ||
-      (oldMaterial.type === "file" ? oldMaterial.url : "")
-    : "";
+  let oldMaterial = editingMaterialId ? materials.find((x) => x.id === editingMaterialId) : null;
+  let file_url = oldMaterial ? (oldMaterial.file_url || "") : "";
 
   try {
     const fileInput = document.getElementById("inp-m-file");
+    
+    // 🚀 ส่วนที่แก้ไข: อัปโหลดไฟล์เอกสารเข้า Supabase
     if (fileInput.files.length > 0) {
-      const GAS_URL = localStorage.getItem("gasUrl");
-      if (!GAS_URL)
-        throw new Error(
-          'กรุณาตั้งค่า Web App URL ในเมนู "ตั้งค่า" เพื่ออัปโหลดไฟล์',
-        );
       const file = fileInput.files[0];
-      const base64 = await new Promise((res, rej) => {
-        const reader = new FileReader();
-        reader.onload = () => res(reader.result);
-        reader.onerror = rej;
-        reader.readAsDataURL(file);
-      });
-      const uploadRes = await fetch(GAS_URL, {
-        method: "POST",
-        body: JSON.stringify({
-          action: "upload_file",
-          data: { name: file.name, type: file.type, base64: base64 },
-        }),
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-      });
-      const uploadJson = await uploadRes.json();
-      if (uploadJson.status !== "success")
-        throw new Error("อัปโหลดไฟล์ไม่สำเร็จ");
-      file_url = uploadJson.file.url;
+      
+      // ตรวจสอบขนาดไฟล์เบื้องต้น (เช่น ไม่เกิน 20MB)
+      if (file.size > 20 * 1024 * 1024) throw new Error("ไฟล์ใหญ่เกิน 20MB ไม่สามารถอัปโหลดได้");
+
+      // สั่งอัปโหลดเข้า Supabase โดยตรง (ส่ง File Object)
+      const fileData = await uploadToSupabase(file, `Doc_${Date.now()}`);
+      
+      // ถ้าเป็นการแก้ไขและมีไฟล์เดิมอยู่ ให้สั่งลบไฟล์เก่าออกจาก Supabase ด้วย
+      if (editingMaterialId && oldMaterial && oldMaterial.file_url) {
+          if (oldMaterial.file_url.includes('supabase.co')) {
+              await deleteFromSupabase(oldMaterial.file_url);
+          }
+      }
+      
+      file_url = fileData.url;
     }
 
-    if (
-      selected_type !== "worksheet" &&
-      !youtube_url &&
-      !link_url &&
-      !album_url &&
-      !file_url &&
-      !contentHtml
-    ) {
+    if (selected_type !== "worksheet" && !youtube_url && !link_url && !album_url && !file_url && !contentHtml) {
       throw new Error("กรุณาใส่เนื้อหาสื่ออย่างน้อย 1 อย่าง");
     }
 
-    // 🟢 โค้ดที่แก้แล้ว: เพิ่ม score_category เข้าไปใน payload
     const payload = {
       course_id,
       title,
@@ -744,89 +702,41 @@ async function saveMaterial() {
       showToast("เพิ่มสื่อการสอนเรียบร้อย! 🎉");
     }
 
-    if (typeof originalMediaUrls !== "undefined") {
-      let currentMediaUrls = [];
-
-      if (cover_url && cover_url.includes("drive.google.com")) {
-        currentMediaUrls.push(cover_url);
-      }
-      if (typeof extractDriveUrls === "function") {
-        currentMediaUrls = currentMediaUrls.concat(
-          extractDriveUrls(contentHtml),
-        );
-      }
-
-      const urlsToDelete = originalMediaUrls.filter(
-        (url) => !currentMediaUrls.includes(url),
-      );
-
-      if (urlsToDelete.length > 0) {
-        const GAS_URL = localStorage.getItem("gasUrl");
-        if (GAS_URL) {
-          urlsToDelete.forEach((url) => {
-            fetch(GAS_URL, {
-              method: "POST",
-              body: JSON.stringify({
-                action: "delete_drive_file",
-                data: { url: url },
-              }),
-              headers: { "Content-Type": "text/plain;charset=utf-8" },
-            }).catch((e) => console.log("ลบรูปภาพเบื้องหลังไม่สำเร็จ", e));
-          });
-        }
-      }
-    }
-
     closeModal();
     await loadInitialData();
   } catch (err) {
     showToast(err.message || "บันทึกล้มเหลว", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+    lucide.createIcons();
   }
-
-  btn.disabled = false;
-  btn.innerHTML = origHtml;
-  lucide.createIcons();
 }
 
 function deleteMaterial(id) {
-  if (!confirm("ยืนยันการลบสื่อการสอนนี้? รูปภาพทั้งหมดในเนื้อหาจะถูกลบไปด้วย"))
-    return;
+  if (!confirm("ยืนยันการลบสื่อการสอนนี้? ไฟล์ที่เกี่ยวข้องจะถูกลบออกจากระบบด้วย")) return;
 
   const m = materials.find((x) => x.id === id);
-
   if (m) {
     let urlsToDelete = [];
-    if (m.cover_url && m.cover_url.includes("drive.google.com"))
-      urlsToDelete.push(m.cover_url);
-    urlsToDelete = urlsToDelete.concat(extractDriveUrls(m.content));
+    if (m.cover_url) urlsToDelete.push(m.cover_url);
+    if (m.file_url) urlsToDelete.push(m.file_url);
+    // ดึง URL รูปจากในเนื้อหาบทความด้วย
+    urlsToDelete = urlsToDelete.concat(extractDriveUrls(m.content)); // ชื่อฟังก์ชันเก่ายังใช้สแกนหา URL ได้
 
-    if (urlsToDelete.length > 0) {
-      const GAS_URL = localStorage.getItem("gasUrl");
-      if (GAS_URL) {
-        urlsToDelete.forEach((url) => {
-          fetch(GAS_URL, {
-            method: "POST",
-            body: JSON.stringify({
-              action: "delete_drive_file",
-              data: { url: url },
-            }),
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-          });
-        });
-      }
-    }
+    // 🚀 สั่งลบไฟล์ออกจาก Supabase
+    urlsToDelete.forEach(async (url) => {
+        if (url.includes('supabase.co')) {
+            await deleteFromSupabase(url);
+        }
+    });
   }
 
-  db.collection("materials")
-    .doc(id)
-    .delete()
-    .then(() => {
-      showToast("ลบสื่อการสอนและไฟล์รูปประกอบสำเร็จ");
-      loadInitialData();
-    })
-    .catch((e) => showToast("ลบล้มเหลว", "error"));
+  db.collection("materials").doc(id).delete().then(() => {
+    showToast("ลบสื่อการสอนสำเร็จ");
+    loadInitialData();
+  });
 }
-
 function showToast(msg, type = "success") {
   const c = document.getElementById("toast-container");
   const t = document.createElement("div");
@@ -845,49 +755,21 @@ async function uploadCoverImage(event) {
   if (!file) return;
 
   const inputUrl = document.getElementById("inp-m-cover");
-  const GAS_URL = localStorage.getItem("gasUrl");
-
-  if (!GAS_URL) {
-    showToast("กรุณาตั้งค่า Web App URL ก่อนอัปโหลดรูปภาพ", "error");
-    event.target.value = "";
-    return;
-  }
 
   showToast("กำลังบีบอัดและอัปโหลดหน้าปก...", "info");
-  inputUrl.value = "กำลังอัปโหลด... โปรดรอสักครู่";
+  inputUrl.value = "กำลังอัปโหลด...";
   inputUrl.disabled = true;
 
   try {
-    const options = {
-      maxSizeMB: 0.3,
-      maxWidthOrHeight: 800,
-      useWebWorker: true,
-    };
+    const options = { maxSizeMB: 0.3, maxWidthOrHeight: 800, useWebWorker: true };
     const compressedFile = await imageCompression(file, options);
 
-    const base64 = await fileToBase64(compressedFile);
-    const type = compressedFile.type;
-    const name = `cover_${Date.now()}.jpg`;
+    // 🚀 อัปโหลดรูปหน้าปกเข้า Supabase
+    const fileData = await uploadToSupabase(compressedFile, `Cover_${Date.now()}`);
 
-    const res = await fetch(GAS_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        action: "upload_material_image",
-        data: { name, type, base64 },
-      }),
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-    });
-
-    const json = await res.json();
-
-    if (json.status === "success") {
-      inputUrl.value = json.file.url;
-      showToast("อัปโหลดรูปหน้าปกสำเร็จ!", "success");
-    } else {
-      throw new Error(json.message || "เกิดข้อผิดพลาดจากฝั่งเซิร์ฟเวอร์");
-    }
+    inputUrl.value = fileData.url;
+    showToast("อัปโหลดรูปหน้าปกสำเร็จ!", "success");
   } catch (e) {
-    console.error("Cover upload failed:", e);
     showToast("อัปโหลดล้มเหลว: " + e.message, "error");
     inputUrl.value = "";
   } finally {

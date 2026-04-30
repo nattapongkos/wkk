@@ -11,7 +11,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
@@ -52,6 +53,11 @@
     firebase.initializeApp(firebaseConfig);
   }
   const db = firebase.firestore();
+
+
+
+
+
 
   // ========================================================
   // 🟢 เปิดระบบ Cache (Offline Persistence) ต้องเรียกใช้เป็นลำดับแรกสุด!
@@ -170,9 +176,29 @@
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
+
+      /* Desktop Tab Navigation Active State */
+      .nav-tab-btn.active {
+        background-color: #eef2ff;
+        color: #4f46e5;
+        border: 1px solid #c7d2fe;
+      }
+
+      /* Mobile Bottom Navigation Active State */
+      .mob-nav-btn.active {
+        color: #4f46e5;
+      }
+      .mob-nav-btn.active i { stroke: #4f46e5; }
+
+      /* Add padding at bottom on mobile so content doesn't hide behind bottom nav */
+      @media (max-width: 767px) {
+        #app {
+          padding-bottom: 4rem;
+        }
+      }
     </style>
   </head>
-  <body class="h-full font-prompt text-slate-800 bg-slate-50 relative">
+  <body class="min-h-full font-prompt text-slate-800 bg-slate-50 relative">
     <div
       id="loading-overlay"
       class="fixed inset-0 flex flex-col items-center justify-center z-[999] bg-white/90"
@@ -199,104 +225,107 @@
       </p>
     </div>
 
-    <div id="app" class="h-full w-full overflow-auto hidden">
+    <div id="app" class="min-h-screen w-full overflow-y-auto hidden">
       <div
         id="toast-container"
         class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"
       ></div>
 
-      <header
-        class="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm"
-      >
-        <div
-          class="max-w-7xl mx-auto px-4 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4"
-        >
-          <div class="flex items-center gap-3">
-            <a
-              href="#"
-              onclick="
-                sessionStorage.removeItem('teacher_secure_access');
-                window.location.href = 'index.html';
-              "
-              class="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 transition-all shrink-0"
-              title="ออกจากระบบครู"
-            >
-              <i data-lucide="log-out" class="w-4 h-4 md:w-5 md:h-5"></i>
+      <header class="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
+          <!-- Left: Logo + Title -->
+          <div class="flex items-center gap-2 min-w-0">
+            <a href="#" onclick="goBackToHome()"
+              class="flex items-center justify-center w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-700 border border-slate-200 transition-all shrink-0" title="กลับหน้าหลัก">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i>
             </a>
-            <div class="flex items-center gap-2 md:gap-3">
-              <div
-                class="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm shrink-0"
-              >
-                <i
-                  data-lucide="shield-check"
-                  class="w-4 h-4 md:w-5 md:h-5 text-white"
-                ></i>
-              </div>
-              <div>
-                <h1
-                  class="text-base md:text-lg font-bold text-slate-800 font-outfit leading-tight tracking-tight"
-                >
-                  Admin Console
-                </h1>
-                <p
-                  id="course-display-header"
-                  class="text-[9px] md:text-[10px] text-indigo-600 font-bold uppercase tracking-widest mt-0.5"
-                >
-                  กำลังเชื่อมต่อ...
-                </p>
-              </div>
+            <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm shrink-0">
+              <i data-lucide="shield-check" class="w-4 h-4 text-white"></i>
+            </div>
+            <div class="min-w-0">
+              <h1 class="text-sm font-bold text-slate-800 font-outfit leading-tight truncate">Admin Console</h1>
+              <p id="course-display-header" class="text-[9px] text-indigo-600 font-bold uppercase tracking-widest truncate">กำลังเชื่อมต่อ...</p>
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2">
-            <button
-              onclick="switchTab('dashboard')"
-              class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 transition-all shrink-0"
-            >
-              <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
-              หน้าหลัก
-            </button>
-
-            <div
-              class="flex items-center gap-1.5 bg-indigo-50 px-2.5 py-1 rounded-xl border border-indigo-100 shrink-0"
-              id="global-course-container"
-            >
-              <i
-                data-lucide="book-open"
-                class="w-3.5 h-3.5 text-indigo-600"
-              ></i>
-              <select
-                id="global-course-select"
-                onchange="changeGlobalCourse()"
-                class="bg-transparent text-xs font-bold text-indigo-700 outline-none cursor-pointer max-w-[130px] !border-none !ring-0"
-              >
+          <!-- Right: Course + Class selectors (always visible) -->
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <div class="flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-xl border border-indigo-100" id="global-course-container">
+              <i data-lucide="book-open" class="w-3 h-3 text-indigo-600 shrink-0"></i>
+              <select id="global-course-select" onchange="changeGlobalCourse()"
+                class="bg-transparent text-xs font-bold text-indigo-700 outline-none cursor-pointer max-w-[90px] sm:max-w-[130px] !border-none !ring-0">
                 <option value="default">โหลดวิชา...</option>
               </select>
-
-              <button
-                onclick="openCourseModal()"
-                class="flex items-center justify-center w-5 h-5 bg-indigo-200 hover:bg-indigo-300 text-indigo-700 rounded-md transition-all ml-1"
-                title="เพิ่มรายวิชาใหม่"
-              >
+              <button onclick="openCourseModal()"
+                class="flex items-center justify-center w-5 h-5 bg-indigo-200 hover:bg-indigo-300 text-indigo-700 rounded-md transition-all ml-0.5" title="เพิ่มรายวิชาใหม่">
                 <i data-lucide="plus" class="w-3 h-3"></i>
               </button>
             </div>
-            <div
-              class="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200 shrink-0"
-              id="global-class-container"
-            >
-              <i data-lucide="users" class="w-3.5 h-3.5 text-slate-500"></i>
-              <select
-                id="global-class-select"
-                onchange="changeClassroom()"
-                class="bg-transparent text-xs font-medium text-slate-700 outline-none cursor-pointer !border-none !ring-0"
-              >
+            <div class="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-xl border border-slate-200" id="global-class-container">
+              <i data-lucide="users" class="w-3 h-3 text-slate-500 shrink-0"></i>
+              <select id="global-class-select" onchange="changeClassroom()"
+                class="bg-transparent text-xs font-medium text-slate-700 outline-none cursor-pointer max-w-[80px] !border-none !ring-0">
                 <option value="all">รวมทุกห้อง</option>
               </select>
             </div>
           </div>
         </div>
+
+        <!-- Desktop Tab Nav (hidden on mobile) -->
+        <div class="hidden md:flex max-w-7xl mx-auto px-3 pb-2 gap-1 overflow-x-auto">
+          <button onclick="switchTab('dashboard')" id="nav-dashboard"
+            class="nav-tab-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all whitespace-nowrap">
+            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> หน้าหลัก
+          </button>
+          <button onclick="switchTab('submissions')" id="nav-submissions"
+            class="nav-tab-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all whitespace-nowrap">
+            <i data-lucide="clipboard-check" class="w-3.5 h-3.5"></i> ตรวจชิ้นงาน
+          </button>
+          <button onclick="switchTab('classroom-center')" id="nav-classroom-center"
+            class="nav-tab-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all whitespace-nowrap">
+            <i data-lucide="graduation-cap" class="w-3.5 h-3.5"></i> ศูนย์ควบคุม
+          </button>
+          <button onclick="switchTab('announcements')" id="nav-announcements"
+            class="nav-tab-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all whitespace-nowrap">
+            <i data-lucide="megaphone" class="w-3.5 h-3.5"></i> จัดการข่าวสาร
+          </button>
+          <button onclick="switchTab('system-settings')" id="nav-system-settings"
+            class="nav-tab-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all whitespace-nowrap">
+            <i data-lucide="settings" class="w-3.5 h-3.5"></i> ตั้งค่าระบบ
+          </button>
+        </div>
       </header>
+
+      <!-- Mobile Bottom Navigation Bar -->
+      <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.07)]">
+        <div class="grid grid-cols-5 h-16">
+          <button onclick="switchTab('dashboard')" id="mob-nav-dashboard"
+            class="mob-nav-btn flex flex-col items-center justify-center gap-0.5 text-slate-400 transition-all">
+            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+            <span class="text-[9px] font-bold">หน้าหลัก</span>
+          </button>
+          <button onclick="switchTab('submissions')" id="mob-nav-submissions"
+            class="mob-nav-btn flex flex-col items-center justify-center gap-0.5 text-slate-400 transition-all">
+            <i data-lucide="clipboard-check" class="w-5 h-5"></i>
+            <span class="text-[9px] font-bold">ชิ้นงาน</span>
+          </button>
+          <button onclick="switchTab('classroom-center')" id="mob-nav-classroom-center"
+            class="mob-nav-btn flex flex-col items-center justify-center gap-0.5 text-slate-400 transition-all">
+            <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+            <span class="text-[9px] font-bold">ห้องเรียน</span>
+          </button>
+          <button onclick="switchTab('announcements')" id="mob-nav-announcements"
+            class="mob-nav-btn flex flex-col items-center justify-center gap-0.5 text-slate-400 transition-all">
+            <i data-lucide="megaphone" class="w-5 h-5"></i>
+            <span class="text-[9px] font-bold">ข่าวสาร</span>
+          </button>
+          <button onclick="switchTab('system-settings')" id="mob-nav-system-settings"
+            class="mob-nav-btn flex flex-col items-center justify-center gap-0.5 text-slate-400 transition-all">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+            <span class="text-[9px] font-bold">ตั้งค่า</span>
+          </button>
+        </div>
+      </nav>
 
       <div
         id="panel-dashboard"
@@ -434,25 +463,12 @@
               onclick="switchTab('system-settings')"
               class="bg-white rounded-[2rem] p-7 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-1 hover:border-slate-300 cursor-pointer transition-all relative overflow-hidden group"
             >
-              <div
-                class="absolute top-0 left-0 w-1.5 h-full bg-slate-500"
-              ></div>
-              <div
-                class="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-slate-100 transition-transform border border-slate-100"
-              >
-                <i
-                  data-lucide="settings"
-                  class="w-7 h-7 text-slate-600 transition-colors"
-                ></i>
+              <div class="absolute top-0 left-0 w-1.5 h-full bg-slate-500"></div>
+              <div class="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-slate-100 transition-transform border border-slate-100">
+                <i data-lucide="settings" class="w-7 h-7 text-slate-600 transition-colors"></i>
               </div>
-              <h3
-                class="text-xl font-bold text-slate-800 mb-2 font-outfit tracking-wide"
-              >
-                ตั้งค่าระบบ
-              </h3>
-              <p class="text-xs text-slate-500 leading-relaxed">
-                เปิด-ปิด เมนูหน้านักเรียน และปรับแต่งรูปภาพ
-              </p>
+              <h3 class="text-xl font-bold text-slate-800 mb-2 font-outfit tracking-wide">ตั้งค่าระบบ</h3>
+              <p class="text-xs text-slate-500 leading-relaxed">เปิด-ปิด เมนูหน้านักเรียน และปรับแต่งรูปภาพ</p>
             </div>
           </div>
         </div>
@@ -1161,6 +1177,8 @@
         </div>
 
       </div>
+
+
       <div
         id="panel-system-settings"
         class="max-w-4xl mx-auto px-4 py-6 hidden slide-up"
@@ -1208,6 +1226,22 @@
                   </div>
               </div>
           </div>
+
+
+          <div class="space-y-4 mt-6 mb-8">
+          <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
+              <div>
+                  <h4 class="font-bold text-slate-700 text-sm">แจ้งเตือน LINE เมื่อนักเรียนออนไลน์</h4>
+                  <p class="text-xs text-slate-500">ส่ง Notify เข้ากลุ่มทันทีเมื่อมีการ Login</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="line-notify-toggle" class="sr-only peer" onchange="toggleLineNotify(this.checked)">
+                  <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+              </label>
+          </div>
+      </div>
+
+
           <div class="mt-8 pt-8 border-t border-slate-200">
            
           
@@ -1535,13 +1569,16 @@
                 />
               </div>
 
-              <button
-                type="submit"
-                id="btn-submit-news"
-                class="w-full bg-rose-500 hover:bg-rose-600 py-4 rounded-2xl text-sm font-bold text-white shadow-sm transition-all mt-6 uppercase tracking-widest flex items-center justify-center gap-2"
-              >
-                <i data-lucide="send" class="w-4 h-4"></i> บันทึกข้อมูลประกาศ
-              </button>
+              <div class="flex gap-3 mt-6">
+                <!-- ปุ่มยกเลิก (ซ่อนไว้ก่อน จะโชว์ตอนกดแก้ไข) -->
+                <button type="button" onclick="cancelEditNews()" id="btn-cancel-news" class="hidden flex-1 bg-slate-100 hover:bg-slate-200 py-4 rounded-2xl text-sm font-bold text-slate-600 shadow-sm transition-all uppercase tracking-widest">
+                  ยกเลิกแก้ไข
+                </button>
+                <!-- ปุ่มบันทึกเดิม -->
+                <button type="submit" id="btn-submit-news" class="flex-1 bg-rose-500 hover:bg-rose-600 py-4 rounded-2xl text-sm font-bold text-white shadow-sm transition-all uppercase tracking-widest flex items-center justify-center gap-2">
+                  <i data-lucide="send" class="w-4 h-4"></i> บันทึกข้อมูลประกาศ
+                </button>
+              </div>
             </form>
           </div>
 

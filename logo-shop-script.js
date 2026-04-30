@@ -160,36 +160,45 @@ async function previewAuctionFile(e) {
     const options = { maxSizeMB: 0.5, maxWidthOrHeight: 800, useWebWorker: true };
     try {
         const compressedFile = await imageCompression(file, options);
-        currentAuctionFile = { name: compressedFile.name, type: compressedFile.type, base64: await readFileAsBase64(compressedFile) };
+        currentAuctionFile = { 
+            name: compressedFile.name, 
+            type: compressedFile.type, 
+            base64: await readFileAsBase64(compressedFile),
+            file: compressedFile // 🟢 เพิ่มบรรทัดนี้ เพื่อเก็บไฟล์ไปส่งให้ Supabase
+        };
         document.getElementById('auction-preview').innerHTML = `<img src="${currentAuctionFile.base64}" class="w-full h-full object-cover">`;
     } catch (err) { showToast('บีบอัดรูปไม่สำเร็จ', 'error'); }
 }
 
+// 🟢 [อัปเดตใหม่]: เพิ่ม Fallback ป้องกันค่าว่าง (undefined) ที่ทำให้บันทึก Firestore ไม่ได้
 async function uploadAndCreateAuction() {
     if(!currentAuctionFile) return showToast('กรุณาเลือกรูปภาพ', 'error');
     const startPrice = parseInt(document.getElementById('auction-start-price').value);
     if(isNaN(startPrice) || startPrice < 10) return showToast('ราคาเริ่มต้นขั้นต่ำ 10 เหรียญ', 'error');
 
-    const btn = document.getElementById('btn-create-auction'); const origHtml = btn.innerHTML;
-    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> กำลังอัปโหลด...'; btn.disabled = true; lucide.createIcons();
+    const btn = document.getElementById('btn-create-auction'); 
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> กำลังอัปโหลด...'; 
+    btn.disabled = true; 
+    if(typeof lucide !== 'undefined') lucide.createIcons();
 
     try {
-        // อัปโหลดรูปลง Google Drive ผ่าน GAS ตัวเดิม
-        const filePayload = { action: "upload_file", data: { name: `Auction_${loggedInUser.id}_${Date.now()}.png`, type: currentAuctionFile.type, base64: currentAuctionFile.base64 } };
-        const fileJson = await uploadFileToGAS(UPLOAD_GAS_URL, filePayload);
-        const imageUrl = fileJson.file.url;
+       
+        // 🚀 1. อัปโหลดภาพเข้า Supabase
+        const fileData = await uploadToSupabase(currentAuctionFile.file, `Auction_${loggedInUser.id}`);
+        const imageUrl = fileData.url;
 
-        // คำนวณเวลา + 24 ชั่วโมง
+        // 2. คำนวณเวลาประมูล + 24 ชั่วโมง
         const endTime = new Date();
         endTime.setHours(endTime.getHours() + 24);
 
-        // บันทึกลง Firebase
+        // 3. บันทึกข้อมูลลง Firestore (ใส่ || "" เพื่อป้องกัน undefined)
         await db.collection('auctions').add({
-            seller_id: String(loggedInUser.id),
-            seller_name: loggedInUser.name,
-            image_url: imageUrl,
-            start_price: startPrice,
-            current_bid: startPrice,
+            seller_id: String(loggedInUser.id || "unknown"),
+            seller_name: loggedInUser.name || "นักเรียนลึกลับ",
+            image_url: imageUrl || "",
+            start_price: startPrice || 10,
+            current_bid: startPrice || 10,
             highest_bidder_id: null,
             highest_bidder_name: null,
             end_time: endTime.toISOString(),
@@ -202,9 +211,12 @@ async function uploadAndCreateAuction() {
         loadAuctions();
 
     } catch (e) {
-        showToast('เกิดข้อผิดพลาด: ' + e.message, 'error');
+        console.error("Auction Error:", e); // พิมพ์ Error ลง Console เพื่อให้หาสาเหตุง่ายขึ้น
+        showToast('เกิดข้อผิดพลาด: ' + (e.message || "ระบบไม่ตอบสนอง"), 'error');
     } finally {
-        btn.innerHTML = origHtml; btn.disabled = false; lucide.createIcons();
+        btn.innerHTML = origHtml; 
+        btn.disabled = false; 
+        if(typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
 

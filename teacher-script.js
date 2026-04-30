@@ -24,8 +24,7 @@ let currentAttTab = "rooms";
 const defaultCategories = [
   { name: "งาน/การบ้าน", max: 20 },
   { name: "สอบกลางภาค", max: 30 },
-  { name: "สอบปลายภาค", max: 50 },
-];
+  { name: "สอบปลายภาค", max: 50 }];
 // 🌟 เกณฑ์คะแนนเริ่มต้นแบบมัธยม
 const defaultGradeCriteria = JSON.stringify({
   g4: 80,
@@ -36,6 +35,80 @@ const defaultGradeCriteria = JSON.stringify({
   g15: 55,
   g1: 50,
 });
+
+
+
+// ==========================================
+// 🗄️ ตั้งค่า Supabase 2 โกดัง (Load Balancing)
+// ==========================================
+const SUPA1_URL = 'https://vbdfnsathdkhthxejkws.supabase.co';
+const SUPA1_KEY = 'sb_publishable_2-XHNvGBpfZwH0gtfjcdIg_bkWv7nqY';
+const supabase1 = supabase.createClient(SUPA1_URL, SUPA1_KEY);
+
+const SUPA2_URL = 'https://cdduysitlkvirsbgbaqj.supabase.co';
+const SUPA2_KEY = 'sb_publishable_fuvWgbT4puXvHmf96dXx5w_kv0BoaC4';
+const supabase2 = supabase.createClient(SUPA2_URL, SUPA2_KEY);
+
+// ชื่อ Bucket ที่ครูต้องไปสร้างไว้ใน Supabase (ต้องตั้งชื่อให้เหมือนกันทั้ง 2 โกดัง)
+const BUCKET_NAME = 'student_works';
+
+// ---------------------------------------------------------
+// 🚀 ฟังก์ชัน 1: อัปโหลดไฟล์เข้า Supabase
+// ---------------------------------------------------------
+async function uploadToSupabase(file, prefixId) {
+    try {
+        // สุ่มโกดัง (50/50)
+        const useStorage1 = Math.random() > 0.5;
+        const activeSupa = useStorage1 ? supabase1 : supabase2;
+        
+        // ตั้งชื่อไฟล์ไม่ให้ซ้ำกัน (ใช้ ID ที่ส่งมา + เวลา)
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${prefixId}_${Date.now()}.${fileExt}`;
+
+        // อัปโหลดไฟล์
+        const { data, error } = await activeSupa.storage
+            .from(BUCKET_NAME)
+            .upload(fileName, file, {
+                cacheControl: '3600',
+                upsert: false
+            });
+
+        if (error) throw error;
+
+        // ขอลิงก์ Public URL
+        const { data: urlData } = activeSupa.storage
+            .from(BUCKET_NAME)
+            .getPublicUrl(fileName);
+
+        return { url: urlData.publicUrl, name: file.name };
+
+    } catch (error) {
+        console.error("Supabase Upload Error:", error);
+        throw new Error("อัปโหลดไฟล์ไม่สำเร็จ: " + error.message);
+    }
+}
+
+// ---------------------------------------------------------
+// 🗑️ ฟังก์ชัน 2: ลบไฟล์ออกจาก Supabase ข้ามโกดัง
+// ---------------------------------------------------------
+async function deleteFromSupabase(fileUrl) {
+    if (!fileUrl) return;
+
+    try {
+        const fileName = fileUrl.split('/').pop(); 
+
+        if (fileUrl.includes(SUPA1_URL.split('//')[1])) {
+            const { error } = await supabase1.storage.from(BUCKET_NAME).remove([fileName]);
+            if (error) console.error("ลบจากโกดัง 1 พลาด:", error);
+        } else if (fileUrl.includes(SUPA2_URL.split('//')[1])) {
+            const { error } = await supabase2.storage.from(BUCKET_NAME).remove([fileName]);
+            if (error) console.error("ลบจากโกดัง 2 พลาด:", error);
+        }
+    } catch (error) {
+        console.error("Supabase Delete Error:", error);
+    }
+}
+
 
 window.onload = async () => {
   lucide.createIcons();
@@ -57,6 +130,12 @@ window.onload = async () => {
   if (addRoomBtn) addRoomBtn.style.display = "none";
 
   await loadAllData();
+
+  // Set initial active nav state
+  const initDesktopBtn = document.getElementById('nav-dashboard');
+  if (initDesktopBtn) initDesktopBtn.classList.add('active');
+  const initMobBtn = document.getElementById('mob-nav-dashboard');
+  if (initMobBtn) initMobBtn.classList.add('active');
 
   // 🚨 ลบบรรทัด setInterval ออกไปเลย เพื่อหยุดการสูบ Data 🚨
   // setInterval(loadAllDataSilent, 15000);
@@ -87,8 +166,7 @@ async function loadAllData() {
       db.collection("students").get(),
       db.collection("courses").get(),
       db.collection("submissions").get(),
-      db.collection("att_records").get(),
-    ]);
+      db.collection("att_records").get()]);
 
     allStudents = studentSnap.docs.map((doc) => ({
       __backendId: doc.id,
@@ -115,8 +193,7 @@ async function loadAllData() {
           course_name: "วิชาเริ่มต้น",
           grade_criteria: defaultGradeCriteria,
           score_categories: JSON.stringify(defaultCategories),
-        },
-      ];
+        }];
     }
     if (!courses.find((c) => c.course_id === currentCourseId))
       currentCourseId = courses[0].course_id;
@@ -235,6 +312,21 @@ function showToast(msg, type = "success") {
   }, 3500);
 }
 
+// 🏠 กลับหน้าหลัก teacher.html พร้อม detach Firebase listeners ทั้งหมดป้องกัน billing
+function goBackToHome() {
+  try {
+    const paths = [
+      'settings', 'settings/memory_flashbacks', 'submissions',
+      'students', 'announcements', 'att_records', 'system_toggles'
+    ];
+    paths.forEach(path => {
+      try { firebase.database().ref(path).off(); } catch(e) {}
+    });
+    try { firebase.database().goOffline(); } catch(e) {}
+  } catch(e) {}
+  window.location.href = 'teacher.html';
+}
+
 function switchTab(tab) {
   // 🟢 เปลี่ยนเส้นทาง tab เก่าไปยังศูนย์ควบคุมชั้นเรียนใหม่ (แท็บย่อย)
   if (["grading", "stats", "export", "attendance"].includes(tab)) {
@@ -249,11 +341,21 @@ function switchTab(tab) {
     "submissions",
     "announcements",
     "system-settings",
-    "classroom-center"
-  ].forEach((t) => {
+    "classroom-center"].forEach((t) => {
     const el = document.getElementById(`panel-${t}`);
     if (el) el.classList.toggle("hidden", t !== tab);
   });
+
+  // อัปเดต Desktop Nav active state
+  document.querySelectorAll('.nav-tab-btn').forEach(btn => btn.classList.remove('active'));
+  const activeDesktopBtn = document.getElementById(`nav-${tab}`);
+  if (activeDesktopBtn) activeDesktopBtn.classList.add('active');
+
+  // อัปเดต Mobile Nav active state
+  document.querySelectorAll('.mob-nav-btn').forEach(btn => btn.classList.remove('active'));
+  const activeMobBtn = document.getElementById(`mob-nav-${tab}`);
+  if (activeMobBtn) activeMobBtn.classList.add('active');
+
   refreshCurrentTab();
 }
 
@@ -667,7 +769,7 @@ function renderTeacherSubmissions() {
               </div>
               <div class="flex items-center gap-3 mt-3 sm:mt-0 shrink-0">
                   ${sub.bucket === "graded" 
-                      ? `<button onclick="openGradeModal('${sub.__backendId}')" class="text-[10px] font-bold text-green-700 border border-green-300 bg-green-50 px-3 py-1.5 rounded-xl uppercase shadow-sm hover:bg-green-100 transition-all flex items-center gap-1.5"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i> ตรวจใหม่ (${sub.score}/${sub.max})</button>` 
+                      ? `<button onclick="openGradeModal('${sub.__backendId}')" class="text-[10px] font-bold text-green-700 border border-green-300 bg-green-50 px-3 py-1.5 rounded-xl uppercase shadow-sm hover:bg-green-100 transition-all flex items-center gap-1.5"><i data-lucide="pencil" class="w-3.5 h-3.5"></i> ตรวจใหม่ (${sub.score}/${sub.max})</button>` 
                       : `<button onclick="openGradeModal('${sub.__backendId}')" class="text-xs bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase tracking-widest">ตรวจงานนี้</button>`
                   }
                   <button onclick="toggleStar('${sub.__backendId}', ${sub.is_starred || false})" class="p-2 bg-white rounded-xl shadow-sm border ${starBtnClass} transition-all hover:scale-110">
@@ -1038,22 +1140,13 @@ async function executeDeleteSubmission() {
   lucide.createIcons();
   try {
     const item = allSubmissions.find((s) => s.__backendId === itemToDeleteSub);
+    // 🟢 ตามลบไฟล์งานออกจาก Supabase
     if (item && item.file_url) {
-      const urls = String(item.file_url)
-        .split("\n")
-        .filter((u) => u.trim() !== "");
+      const urls = String(item.file_url).split("\n").filter((u) => u.trim() !== "");
       for (let url of urls) {
-        try {
-          if (GAS_URL && !GAS_URL.includes("วาง_URL"))
-            await fetch(GAS_URL, {
-              method: "POST",
-              body: JSON.stringify({
-                action: "delete_file",
-                data: { url: url },
-              }),
-              headers: { "Content-Type": "text/plain;charset=utf-8" },
-            });
-        } catch (e) {}
+        if (url.includes('supabase.co')) {
+          await deleteFromSupabase(url); // เรียกใช้งาน Supabase Delete
+        }
       }
     }
     await db.collection("submissions").doc(itemToDeleteSub).delete();
@@ -1679,7 +1772,7 @@ async function confirmDelete() {
     // 🌟 2. จัดการลบส่วนอื่นๆ ด้วย Batch (รวมทีเดียวเพื่อความไว)
     const batch = db.batch();
 
-    // 2.1 ลบชิ้นงาน (Submissions) และเคลียร์ไฟล์ขยะใน Google Drive
+    // 2.1 ลบชิ้นงาน (Submissions) และเคลียร์ไฟล์ขยะใน Supabase
     console.log("🔍 กำลังเคลียร์ชิ้นงานและการบ้าน...");
     const subSnap = await db.collection("submissions").where("student_id", "==", studentIdStr).get();
     for (const doc of subSnap.docs) {
@@ -1687,16 +1780,9 @@ async function confirmDelete() {
       if (item.file_url) {
         const urls = String(item.file_url).split("\n").filter((u) => u.trim() !== "");
         for (let url of urls) {
-          try {
-            if (GAS_URL && !GAS_URL.includes("วาง_URL")) {
-              await fetch(GAS_URL, {
-                method: "POST",
-                mode: "no-cors", // บังคับทะลุบล็อก
-                body: JSON.stringify({ action: "delete_file", data: { url: url } }),
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-              });
-            }
-          } catch (e) { console.error("แจ้งลบไฟล์ Drive พลาด:", e); }
+          if (url.includes('supabase.co')) {
+            await deleteFromSupabase(url); // สั่งลบไฟล์นักเรียนคนนี้ออกจาก Supabase
+          }
         }
       }
       batch.delete(doc.ref);
@@ -3244,8 +3330,7 @@ const systemFeatures = [
     id: "toggle_review",
     label: "ทบทวนบทเรียน & ทดสอบความรู้",
     icon: "book-open-check",
-  },
-];
+  }];
 
 // ดึงข้อมูลตอนเปิดหน้า Tab
 async function loadSystemToggles() {
@@ -3405,19 +3490,33 @@ let newsState = {
   oldFileUrl: null,
 };
 
-// 2. ฟังก์ชันช่วยเหลือ: ส่งคำสั่งลบไฟล์ไปที่ Google Drive (ซ่อน CORS)
+
+// ========================================================
+// 🗑️ ฟังก์ชันตัวช่วยลบไฟล์ (รองรับทั้ง Drive และ Supabase)
+// ========================================================
 async function deleteFileFromDrive(url) {
-  if (!url || !GAS_URL || GAS_URL.includes("วาง_URL")) return;
+  if (!url) return;
+  
   try {
-    console.log("กำลังสั่งลบไฟล์ขยะออกจาก Drive:", url);
-    await fetch(GAS_URL, {
-      method: "POST",
-      mode: "no-cors", // บังคับทะลุบล็อก
-      body: JSON.stringify({ action: "delete_file", data: { url: url } }),
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-    });
+    // 🟢 ถ้าเป็นลิงก์ของ Supabase ให้เรียกฟังก์ชัน Supabase ลบ
+    if (url.includes('supabase.co')) {
+      console.log("กำลังลบไฟล์ออกจาก Supabase:", url);
+      await deleteFromSupabase(url);
+      return;
+    }
+
+    // 🟢 ถ้าเป็นลิงก์ของ Google Drive (อันเก่า) ค่อยให้ GAS ลบ
+    if (GAS_URL && !GAS_URL.includes("วาง_URL")) {
+        console.log("กำลังสั่งลบไฟล์ขยะออกจาก Drive:", url);
+        await fetch(GAS_URL, {
+          method: "POST",
+          mode: "no-cors",
+          body: JSON.stringify({ action: "delete_file", data: { url: url } }),
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+        });
+    }
   } catch (e) {
-    console.error("ลบไฟล์จาก Drive ไม่สำเร็จ:", e);
+    console.error("ลบไฟล์ไม่สำเร็จ:", e);
   }
 }
 
@@ -3519,61 +3618,60 @@ async function editAnnouncement(id) {
       .getElementById("panel-announcements")
       .scrollIntoView({ behavior: "smooth" });
     showToast("ดึงข้อมูลพร้อมแก้ไข ✏️", "success");
+    const cancelBtn = document.getElementById("btn-cancel-news");
+    if(cancelBtn) cancelBtn.classList.remove("hidden");
   } catch (error) {
     showToast("เกิดข้อผิดพลาดในการดึงข้อมูล", "error");
   }
 }
 
 // 5. ฟังก์ชันอัปโหลดภาพ (ถ้ามีรูปเดิมอยู่ จะลบรูปเดิมทิ้งทันที)
+// ========================================================
+// 📢 ฟังก์ชันอัปโหลดหน้าปกประกาศข่าวสาร (Supabase)
+// ========================================================
 async function uploadBannerToDrive() {
   const fileInput = document.getElementById("banner-upload");
   const file = fileInput.files[0];
   if (!file) return showToast("กรุณาเลือกรูปภาพก่อนครับ", "error");
 
-  if (!GAS_URL || GAS_URL.includes("ใส่_URL")) {
-    return showToast("กรุณาตั้งค่า Web App URL ก่อนครับ", "error");
-  }
-
   const btn = document.getElementById("btn-upload-banner");
   const originalHtml = btn.innerHTML;
-  btn.innerHTML =
-    '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> อัปโหลด...';
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> อัปโหลด...';
   btn.disabled = true;
   lucide.createIcons();
 
   try {
+    // ใช้ฟังก์ชันบีบอัดรูปเดิมของครู (ได้ค่าเป็น Base64)
     const base64Image = await compressImage(file, 1200, 0.8);
-    const response = await fetch(GAS_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        action: "upload_banner",
-        data: { base64: base64Image },
-      }),
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-    });
+    
+    // 🛠️ แปลง Base64 กลับเป็น Blob (Binary) เพื่อให้ส่งเข้า Supabase ได้
+    const arr = base64Image.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--) { u8arr[n] = bstr.charCodeAt(n); }
+    const blobFile = new File([u8arr], file.name, { type: mime });
 
-    const result = await response.json();
-    if (result.status === "success") {
-      // ถ้านี่คือการแก้ไข และมีรูปเก่าอยู่ ให้สั่งลบรูปเก่าจาก Drive ทิ้งเลย
-      if (newsState.oldCoverUrl) {
-        await deleteFileFromDrive(newsState.oldCoverUrl);
-      }
-
-      // นำลิงก์ใหม่มาแสดง
-      const newUrl = result.url;
-      document.getElementById("news-cover").value = newUrl;
-      document.getElementById("banner-preview").src = newUrl;
-      document
-        .getElementById("banner-preview-container")
-        .classList.remove("hidden");
-
-      // อัปเดต State ให้จำรูปใหม่
-      newsState.oldCoverUrl = newUrl;
-      showToast("อัปโหลดและอัปเดตรูปภาพสำเร็จ 🖼️", "success");
-    } else {
-      throw new Error("อัปโหลดล้มเหลว");
+    // 🚀 อัปโหลดเข้า Supabase
+    const fileData = await uploadToSupabase(blobFile, `NewsBanner`);
+    
+    // ถ้านี่คือการแก้ไข และมีรูปเก่าอยู่ ให้สั่งลบรูปเก่าจากระบบทิ้งเลย
+    if (newsState.oldCoverUrl) {
+      await deleteFileFromDrive(newsState.oldCoverUrl);
     }
+
+    // นำลิงก์ใหม่มาแสดงและจำค่าไว้
+    const newUrl = fileData.url;
+    document.getElementById("news-cover").value = newUrl;
+    document.getElementById("banner-preview").src = newUrl;
+    document.getElementById("banner-preview-container").classList.remove("hidden");
+    newsState.oldCoverUrl = newUrl;
+    
+    showToast("อัปโหลดและอัปเดตรูปภาพสำเร็จ 🖼️", "success");
+
   } catch (error) {
+    console.error(error);
     showToast("ไม่สามารถอัปโหลดได้", "error");
   } finally {
     btn.disabled = false;
@@ -3600,9 +3698,35 @@ async function removeBanner() {
   showToast("ลบรูปภาพออกแล้ว", "info");
 }
 
-// 7. ฟังก์ชันบันทึกข้อมูล (สร้างใหม่ / อัปเดต)
+
+function cancelEditNews() {
+    // ล้างค่าในฟอร์ม
+    document.querySelector('form[onsubmit="submitAnnouncement(event)"]').reset();
+    document.getElementById("edit-news-id").value = "";
+    document.getElementById("news-cover").value = "";
+    document.getElementById("banner-preview").src = "";
+    document.getElementById("banner-preview-container").classList.add("hidden");
+    document.getElementById("banner-upload").value = "";
+    
+    // ซ่อนปุ่มยกเลิกกลับไป
+    document.getElementById("btn-cancel-news").classList.add("hidden");
+    
+    // รีเซ็ตสถานะระบบ
+    newsState = { editId: null, oldCoverUrl: null, oldFileUrl: null };
+    showToast("ยกเลิกการแก้ไข เปลี่ยนเป็นโหมดสร้างประกาศใหม่", "info");
+}  
+
+
 async function submitAnnouncement(e) {
   e.preventDefault();
+
+  // 🛑 เพิ่มโค้ดส่วนนี้: ดักจับกรณีเลือกรูปไว้แต่ลืมกดปุ่ม "อัพโหลด"
+  const fileInput = document.getElementById("banner-upload");
+  if (fileInput && fileInput.files.length > 0) {
+      showToast("⚠️ คุณเลือกรูปภาพไว้แต่ยังไม่ได้กด 'อัพโหลด' กรุณากดปุ่มอัพโหลดก่อนบันทึกครับ", "error");
+      return; // เบรกการทำงานไว้ ไม่ให้เซฟจนกว่าจะอัพโหลดเสร็จ
+  }
+
   const btn = document.getElementById("btn-submit-news");
   const origHtml = btn.innerHTML;
 
@@ -3615,16 +3739,12 @@ async function submitAnnouncement(e) {
   };
 
   btn.disabled = true;
-  btn.innerHTML =
-    '<i data-lucide="loader-2" class="w-5 h-5 animate-spin inline"></i> กำลังบันทึก...';
-  lucide.createIcons();
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin inline"></i> กำลังบันทึก...';
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 
   try {
     if (newsState.editId) {
-      await db
-        .collection("announcements")
-        .doc(newsState.editId)
-        .update(payload);
+      await db.collection("announcements").doc(newsState.editId).update(payload);
       showToast("อัปเดตประกาศข่าวสารสำเร็จ! ✨", "success");
     } else {
       await db.collection("announcements").add(payload);
@@ -3637,6 +3757,11 @@ async function submitAnnouncement(e) {
     document.getElementById("news-cover").value = "";
     document.getElementById("banner-preview").src = "";
     document.getElementById("banner-preview-container").classList.add("hidden");
+    
+    // ซ่อนปุ่มยกเลิก (ถ้ามี)
+    const cancelBtn = document.getElementById("btn-cancel-news");
+    if(cancelBtn) cancelBtn.classList.add("hidden");
+
     newsState = { editId: null, oldCoverUrl: null, oldFileUrl: null }; // Reset State
 
     loadAdminAnnouncements(); // อัปเดตรายการ
@@ -3645,7 +3770,7 @@ async function submitAnnouncement(e) {
   }
   btn.disabled = false;
   btn.innerHTML = origHtml;
-  lucide.createIcons();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // 8. ระบบลบข่าวสาร (ลบทั้ง DB และ Drive)
@@ -4534,3 +4659,43 @@ setTimeout(() => {
         loadSystemStatus();
     }
 }, 800); // หน่วงเวลาเล็กน้อยรอให้ระบบ Firebase โหลดเสร็จ
+
+
+// ==========================================
+// ระบบจัดการเปิด-ปิด LINE Notify
+// ==========================================
+
+// 1. ดักฟังสถานะปัจจุบันจาก Firebase เพื่อเซ็ตให้ปุ่มแสดงสถานะตรงกับฐานข้อมูล
+firebase.database().ref('settings/line_notify_enabled').on('value', (snapshot) => {
+    const isEnabled = snapshot.val() || false;
+    const toggleInput = document.getElementById('line-notify-toggle');
+    if (toggleInput) {
+        toggleInput.checked = isEnabled;
+    }
+});
+
+// 2. ฟังก์ชันอัปเดตสถานะเมื่อครูกดสวิตช์
+function toggleLineNotify(isChecked) {
+    firebase.database().ref('settings/line_notify_enabled').set(isChecked)
+        .then(() => {
+            // ใช้ SweetAlert แจ้งเตือนผลลัพธ์
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: isChecked ? 'เปิดแจ้งเตือนแล้ว' : 'ปิดการแจ้งเตือน',
+                    text: isChecked ? 'ระบบจะแจ้งเตือนเมื่อนักเรียนล็อกอิน' : 'หยุดส่งการแจ้งเตือนชั่วคราว',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            }
+        })
+        .catch((error) => {
+            console.error("Error updating Line Notify:", error);
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: 'ไม่สามารถอัปเดตสถานะได้' });
+            }
+        });
+}
+
+
+
