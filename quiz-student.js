@@ -6,24 +6,46 @@ window.onload = () => {
     checkAuthSession(); // เรียกใช้ฟังก์ชันเช็คการล็อกอิน
 };
 
-// 🌟 ฟังก์ชันดึงรหัสจากการล็อกอินหน้าหลักมาใส่อัตโนมัติ
 function checkAuthSession() {
-    const savedSession = localStorage.getItem('student_session');
-    if (savedSession) {
-        const loggedInUser = JSON.parse(savedSession);
-        const loginInput = document.getElementById('login-id');
-        
-        if (loginInput) {
-            loginInput.value = loggedInUser.id; // ใส่รหัส
-            loginInput.readOnly = true; // ล็อกไม่ให้แก้
-            loginInput.classList.add('bg-slate-200', 'text-slate-500', 'cursor-not-allowed');
-            
-            // สั่งให้ระบบกดปุ่ม "ถัดไป" ให้อัตโนมัติ เพื่อดูข้อสอบทันที
-            handleLogin({ preventDefault: () => {} });
+    // 1. ดึงรหัสจาก URL (ที่ส่งมาจากหน้า index.html?id=xxxx)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlId = urlParams.get('id');
+    
+    let studentId = urlId;
+
+    // 2. ถ้าใน URL ไม่มี (เช่น พิมพ์เข้าหน้าตรงๆ) ให้ดึงจาก Storage
+    if (!studentId) {
+        const savedSession = localStorage.getItem('student_session');
+        if (savedSession) {
+            try {
+                const loggedInUser = JSON.parse(savedSession);
+                // *** แก้จุดนี้: เอา .id ออก ให้เหลือแค่ .student_id เท่านั้น ***
+                studentId = loggedInUser.student_id; 
+            } catch(e) {
+                console.error("Error reading session:", e);
+            }
         }
     }
-}
 
+    // 3. เมื่อได้รหัสที่ถูกต้องแล้ว ให้ทำระบบ Login อัตโนมัติ
+    if (studentId && studentId !== 'undefined') {
+        const loginInput = document.getElementById('login-id');
+        if (loginInput) {
+            loginInput.value = studentId; 
+            loginInput.readOnly = true;
+            loginInput.style.backgroundColor = "#f1f5f9"; // ทำเป็นสีเทาเพื่อให้รู้ว่าล็อกไว้
+        }
+        
+        // สั่ง Login อัตโนมัติ
+        setTimeout(() => {
+            handleLogin({ 
+                preventDefault: () => {}, 
+                isAutoLogin: true, 
+                savedId: studentId 
+            });
+        }, 500);
+    }
+}
 async function handleLogin(e) {
     e.preventDefault();
     const id = document.getElementById('login-id').value.trim();

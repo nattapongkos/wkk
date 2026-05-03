@@ -4034,7 +4034,6 @@ function openMissingAssignmentsModal() {
     const listEl = document.getElementById("missing-assignments-list");
     
     if (globalMissingAssignments.length === 0) {
-        // กรณีไม่มีงานค้างเลย
         listEl.innerHTML = `
             <div class="text-center py-8 bg-emerald-50 rounded-2xl border border-emerald-100">
                 <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
@@ -4045,7 +4044,6 @@ function openMissingAssignmentsModal() {
             </div>
         `;
     } else {
-        // วาดรายการงานค้าง พร้อมเช็คเงื่อนไขประเภทงาน
         listEl.innerHTML = globalMissingAssignments.map(task => {
             let actionHtml = "";
             const taskName = task.name || "";
@@ -4053,20 +4051,22 @@ function openMissingAssignmentsModal() {
             // 1. ตรวจสอบว่าเป็น สอบกลางภาค หรือ สอบปลายภาค
             if (taskName.includes("สอบกลางภาค") || taskName.includes("สอบปลายภาค")) {
                 actionHtml = `
-                    <div class="shrink-0 bg-slate-100 text-slate-500 px-3 py-2.5 rounded-xl text-[10px] font-bold transition-all shadow-sm border border-slate-200 flex items-center gap-1.5 uppercase tracking-widest cursor-not-allowed">
+                    <div class="shrink-0 bg-slate-100 text-slate-500 px-3 py-2.5 rounded-xl text-[10px] font-bold border border-slate-200 flex items-center gap-1.5 uppercase tracking-widest cursor-not-allowed">
                         <i data-lucide="x-circle" class="w-3 h-3 text-slate-400"></i> ยังไม่ได้สอบ
                     </div>
                 `;
             } 
-            // 2. ตรวจสอบว่าเป็น แบบฝึกหัด
-            else if (taskName.includes("แบบฝึกหัด")) {
+            // 2. งานจาก Hub: เพิ่มคำว่า "ใบงาน" เข้าไปด้วย
+            else if (taskName.includes("แบบฝึกหัด") || taskName.includes("งานที่") || taskName.includes("แบบทดสอบ") || taskName.includes("บทเรียน") || taskName.includes("ใบงาน")) {
+                const targetUrl = taskName.includes("แบบทดสอบ") ? 'quiz-student.html' : 'materials-student.html';
+                
                 actionHtml = `
-                    <button onclick="window.location.href='quiz-student.html'" class="shrink-0 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2.5 rounded-xl text-[10px] font-bold transition-all shadow-sm hover:-translate-y-0.5 flex items-center gap-1.5 uppercase tracking-widest">
-                        ทำแบบฝึกหัด <i data-lucide="external-link" class="w-3 h-3"></i>
+                    <button onclick="goToClass('${targetUrl}')" class="shrink-0 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2.5 rounded-xl text-[10px] font-bold transition-all shadow-sm hover:-translate-y-0.5 flex items-center gap-1.5 uppercase tracking-widest">
+                        ทำใน HUB <i data-lucide="external-link" class="w-3 h-3"></i>
                     </button>
                 `;
-            } 
-            // 3. งานปกติ (ให้ส่งงานผ่านระบบ)
+            }
+            // 3. งานปกติอื่นๆ (ให้แนบไฟล์ส่งผ่านระบบเหมือนเดิม)
             else {
                 actionHtml = `
                     <button onclick="goToSubmitMissingTask('${task.name}')" class="shrink-0 bg-rose-500 hover:bg-rose-600 text-white px-3 py-2.5 rounded-xl text-[10px] font-bold transition-all shadow-sm hover:-translate-y-0.5 flex items-center gap-1.5 uppercase tracking-widest">
@@ -5444,3 +5444,187 @@ window.addEventListener('resize', () => {
         if (memoryArray.length > 0) renderFlashbackGrid();
     }, 250);
 });
+
+
+// ==========================================
+// 🗺️ ระบบ Quest Map ฝั่งนักเรียน (Horizontal + Modal Toy Style)
+// ==========================================
+// ค้นหาฟังก์ชัน initStudentQuestMap
+function initStudentQuestMap() {
+    if (typeof firebase === 'undefined') return;
+    
+    // ต้องรู้ก่อนว่านักเรียนอยู่ห้องไหน 
+    let rawStudentRoomId = 'all'; 
+    if (loggedInUser && loggedInUser.id) {
+        const studentInfo = teacherDbStudents.find(s => String(s.student_id) === String(loggedInUser.id));
+        if (studentInfo && studentInfo.classroom) {
+            rawStudentRoomId = studentInfo.classroom;
+        }
+    }
+
+    // 🌟 แปลงชื่อห้องให้ปลอดภัยสำหรับ Firebase
+    const studentRoomId = rawStudentRoomId === 'all' ? 'all' : rawStudentRoomId.replace(/[\/\.]/g, "_");
+
+    // ฟังก์ชันย่อยสำหรับโหลดข้อมูล และแสดงผล
+    const loadAndRenderQuests = (roomId) => {
+        const dbRef = firebase.database().ref(`quest_map/quests/${roomId}`);
+        
+        dbRef.once('value').then((snapshot) => {
+            const data = snapshot.val();
+            const listEl = document.getElementById('learning-map-list');
+            const modalListEl = document.getElementById('learning-modal-list');
+            const viewMoreBtn = document.getElementById('learning-view-more-container');
+            if (!listEl) return;
+            
+            // ถ้าดึงข้อมูลห้องเฉพาะแล้วไม่เจอ ลองดึงของ 'all' (Global) เป็น fallback
+            if (!data && roomId !== 'all') {
+                console.log(`ไม่พบเควสต์ของห้อง ${roomId} กำลังดึงเควสต์รวม (all)`);
+                loadAndRenderQuests('all');
+                return;
+            }
+
+            if (!data) {
+                listEl.innerHTML = '<div class="text-center w-full py-6 text-slate-400 font-black text-[10px] uppercase">ยังไม่มีภารกิจ 🚩</div>';
+                if(modalListEl) modalListEl.innerHTML = '';
+                return;
+            }
+
+            // แปลงข้อมูลและเรียงลำดับ
+            const quests = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+            quests.sort((a, b) => a.timestamp - b.timestamp);
+
+            let horizontalHtml = '';
+            let verticalHtml = '';
+
+            quests.forEach((q, index) => {
+                let isCompleted = q.status === 'completed';
+                let isActive = q.status === 'active';
+                let bgBox = isCompleted ? 'bg-[#10b981]' : (isActive ? 'bg-[#ffd200]' : 'bg-white');
+                let icon = isCompleted ? 'check' : (isActive ? 'play' : 'lock');
+                let iconColor = isCompleted ? 'text-white' : (isActive ? 'text-black' : 'text-slate-300');
+                let textColor = isCompleted ? 'text-emerald-700' : (isActive ? 'text-amber-700' : 'text-slate-400');
+                let pulseClass = isActive ? 'animate-pulse' : '';
+                let botSeed = `BotLevel${index + 1}`;
+
+                // --- วาดแนวนอน (ย่อขนาดลง) ---
+                if (index < 5) {
+                    horizontalHtml += `
+                    <div class="flex items-end shrink-0 relative mt-10">
+                        <img src="https://api.dicebear.com/7.x/bottts/svg?seed=${botSeed}" class="absolute -top-10 left-1/2 -translate-x-1/2 w-10 h-10 sm:w-12 sm:h-12 drop-shadow-sm z-10 pointer-events-none">
+
+                        <div onclick="openLearningMapModal()" class="flex flex-col items-center w-20 sm:w-24 group relative z-0 cursor-pointer">
+                            <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border-[3px] border-black ${bgBox} flex items-center justify-center shadow-[3px_3px_0_#000] transition-transform group-hover:-translate-y-1 ${pulseClass}">
+                                <i data-lucide="${icon}" class="w-5 h-5 sm:w-6 sm:h-6 ${iconColor}"></i>
+                            </div>
+                            <p class="text-[9px] sm:text-[10px] font-black text-center mt-2 leading-tight line-clamp-2 px-1 ${textColor}">
+                                ${q.title}
+                            </p>
+                        </div>
+                        
+                        ${(index < 4 && index < quests.length - 1) ? `
+                        <div class="w-4 sm:w-6 flex items-center justify-center pb-8 shrink-0">
+                            <i data-lucide="chevron-right" class="w-4 h-4 text-black opacity-20"></i>
+                        </div>` : ''}
+                    </div>`;
+                }
+
+                // --- วาดแนวตั้ง (สำหรับ Popup) ---
+                if (modalListEl) {
+                    let vStatusClass = isCompleted ? 'quest-completed' : (isActive ? 'quest-active' : 'quest-locked opacity-70');
+                    let vDotColor = isCompleted ? 'bg-[#10b981]' : (isActive ? 'bg-[#ffd200]' : 'bg-slate-300');
+                    verticalHtml += `
+                    <div class="quest-node ${vStatusClass} relative mt-4">
+                        <div class="absolute -top-6 left-2 z-10 w-8 h-8">
+                           <img src="https://api.dicebear.com/7.x/bottts/svg?seed=${botSeed}" class="w-full h-full drop-shadow-sm">
+                        </div>
+                        <div class="quest-circle w-10 h-10 border-[3px] border-black rounded-xl transform hover:scale-110 transition-transform bg-white relative z-0 mt-2">
+                           <div class="w-full h-full rounded-[0.5rem] flex items-center justify-center ${bgBox}">
+                              <i data-lucide="${icon}" class="w-4 h-4 ${iconColor}"></i>
+                           </div>
+                        </div>
+                        <div class="quest-content group mt-2 p-3 border-[3px] border-black rounded-2xl bg-white shadow-sm flex-1 flex items-center justify-between">
+                            <span class="font-black text-[11px] sm:text-xs uppercase tracking-widest line-clamp-1 group-hover:text-[#009de0]">
+                                ${index + 1}. ${q.title}
+                            </span>
+                            <div class="w-3 h-3 rounded-full border-2 border-black ${vDotColor} shadow-[1px_1px_0_#000] shrink-0"></div>
+                        </div>
+                    </div>`;
+                }
+            });
+
+            listEl.innerHTML = horizontalHtml;
+            if (modalListEl) modalListEl.innerHTML = verticalHtml;
+            if (quests.length > 5 && viewMoreBtn) viewMoreBtn.classList.remove('hidden');
+            else if (viewMoreBtn) viewMoreBtn.classList.add('hidden');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            
+            // ดักฟังการเปลี่ยนแปลงหลังจากโหลดสำเร็จแล้ว (อัปเดตแบบ Realtime)
+            // เช็คและอัปเดตใหม่เมื่อมีข้อมูลเข้า
+            firebase.database().ref(`quest_map/quests/${roomId}`).on('value', (rtSnapshot) => {
+                // หลีกเลี่ยง loop ซ้อน
+                if(!rtSnapshot.exists()) return;
+                // โค้ดเรนเดอร์ซ้ำ หรือใช้วิธีดึงเฉพาะสถานะอัปเดต (แต่เพื่อความง่าย วาดใหม่ทั้งหมดก็เพียงพอในกรณีข้อมูลน้อย)
+            });
+            
+        }).catch(e => console.error("Error loading quests:", e));
+    };
+
+    // โหลดเควสต์สำหรับห้องของนักเรียน (จะ fallback เป็น 'all' ถ้าไม่มี)
+    loadAndRenderQuests(studentRoomId);
+}
+
+function openLearningMapModal() {
+    const modal = document.getElementById('learning-map-modal');
+    if(modal) modal.classList.remove('hidden');
+}
+
+function closeLearningMapModal() {
+    const modal = document.getElementById('learning-map-modal');
+    if(modal) modal.classList.add('hidden');
+}
+
+// รอให้ไฟล์และ Firebase โหลดเสร็จก่อนค่อยดึงข้อมูลด่าน
+setTimeout(() => {
+    initStudentQuestMap();
+}, 1500);
+
+
+
+
+      // ========================================================
+      // 🎲 ระบบสุ่มคำคมปลุกใจในหน้า Login
+      // ========================================================
+      const classroomQuotes = [
+        "เรียนรู้ให้เหมือนเล่นเกม แล้วทุกด่านจะมีความหมาย 🎮",
+        "วันนี้ก็คือ Level ใหม่ เริ่มต้นลุยกันเลย! 🚀",
+        "ไม่มีคำว่าล้มเหลว มีแต่คำว่าเรียนรู้และเติบโต 🌱",
+        "ทุกความพยายามคือ EXP ที่ทำให้เราเก่งขึ้น 💯",
+        "อย่ากลัวที่จะทำผิด เพราะมันคือบอสที่เราต้องผ่านไปให้ได้ 👾",
+        "ห้องเรียนนี้คือพื้นที่ปล่อยของ โชว์พลังกันหน่อย! ⚡",
+        "ก้าวเล็กๆ ในวันนี้ คือก้าวกระโดดในวันหน้า 🏃‍♂️",
+        "รอยยิ้มและเสียงหัวเราะ คือพลังงานชั้นดีในการเรียน 😄",
+        "เตรียมตัวให้พร้อม แล้วมารับความสนุกในห้องเรียนกันเถอะ 🎢",
+        "ไม่มีใครเก่งมาตั้งแต่เกิด แต่เราเก่งขึ้นได้ทุกวัน 💪",
+        "เปิดรับสิ่งใหม่ แล้วโลกจะกว้างขึ้นกว่าเดิม 🌍",
+        "จินตนาการสำคัญพอๆ กับความรู้ มาระเบิดไอเดียกัน! 💥",
+        "การเรียนไม่ใช่การแข่งขัน แต่คือการท้าทายตัวเอง 🏆",
+        "เหนื่อยก็พัก แต่อย่าเพิ่งหยุดเดินนะ 🏕️",
+        "เชื่อมั่นในตัวเอง คุณทำได้มากกว่าที่คิด! ✨",
+        "ความผิดพลาดคือบทเรียนที่ไม่มีในหนังสือ 📖",
+        "พร้อมที่จะ Level Up หรือยัง? ล็อกอินเข้ามาเลย! 🔋",
+        "ห้องเรียนของเราคือเซฟโซน ปลอดภัย อบอุ่น และสนุก 🏡",
+        "อย่าลืมพกความมั่นใจและรอยยิ้มมาด้วยนะ 😁",
+        "ทุกวันคือโอกาสใหม่ในการสร้างผลงานชิ้นเอก 🎨"
+      ];
+
+      function setRandomQuote() {
+        const quoteEl = document.getElementById("random-quote-text");
+        if (quoteEl) {
+          const randomIdx = Math.floor(Math.random() * classroomQuotes.length);
+          quoteEl.textContent = classroomQuotes[randomIdx];
+        }
+      }
+
+      // สุ่มคำคมทันทีที่หน้าเว็บโหลดเสร็จ
+      window.addEventListener('DOMContentLoaded', setRandomQuote);
+    

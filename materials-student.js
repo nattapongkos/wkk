@@ -15,144 +15,123 @@ window.onload = () => {
 };
 
 function checkAuthSession() {
-    const savedSession = localStorage.getItem('student_session');
-    if (savedSession) {
-        // 🟢 แก้ไข: ให้ทำการ Login ทันทีที่มี Session โดยไม่สนว่าจะมีช่องกรอกเลขที่หรือไม่
-        const loggedInUser = JSON.parse(savedSession);
+    // 1. ดึงรหัสจาก URL (ที่ส่งมาจากหน้า index.html?id=xxxx)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlId = urlParams.get('id');
+    
+    let studentId = urlId;
+
+    // 2. ถ้าใน URL ไม่มี (เช่น พิมพ์เข้าหน้าตรงๆ) ให้ดึงจาก Storage
+    if (!studentId) {
+        const savedSession = localStorage.getItem('student_session');
+        if (savedSession) {
+            try {
+                const loggedInUser = JSON.parse(savedSession);
+                // *** แก้จุดนี้: เอา .id ออก ให้เหลือแค่ .student_id เท่านั้น ***
+                studentId = loggedInUser.student_id; 
+            } catch(e) {
+                console.error("Error reading session:", e);
+            }
+        }
+    }
+
+    // 3. เมื่อได้รหัสที่ถูกต้องแล้ว ให้ทำระบบ Login อัตโนมัติ
+    if (studentId && studentId !== 'undefined') {
         const loginInput = document.getElementById('login-id');
-        
         if (loginInput) {
-            loginInput.value = loggedInUser.id; 
-            loginInput.readOnly = true; 
+            loginInput.value = studentId; 
+            loginInput.readOnly = true;
+            loginInput.style.backgroundColor = "#f1f5f9"; // ทำเป็นสีเทาเพื่อให้รู้ว่าล็อกไว้
         }
         
-        // 🟢 เรียก handleLogin โดยส่งข้อมูลจำลองไปเพื่อให้ระบบทำงานต่อได้
-        handleLogin({ 
-            preventDefault: () => {}, 
-            isAutoLogin: true, 
-            savedId: loggedInUser.id 
-        });
+        // สั่ง Login อัตโนมัติ
+        setTimeout(() => {
+            handleLogin({ 
+                preventDefault: () => {}, 
+                isAutoLogin: true, 
+                savedId: studentId 
+            });
+        }, 500);
     }
 }
 
-/**
- * ฟังก์ชันเข้าสู่ระบบสำหรับนักเรียน (Full Version)
- * - ตรวจสอบตัวตนผ่าน Firebase
- * - ป้องกันเคสเด็กที่ถูกลบออกจากระบบแต่ยังมี Session ค้าง
- * - จัดการ UI Loading และพิกัด/ข้อมูลเบื้องต้น
- */
 async function handleLogin(e) {
-    if (e) e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
 
-    const idInput = document.getElementById('login-id');
-    const btn = document.getElementById('btn-login');
-    const studentId = idInput ? idInput.value.trim() : "";
+    // 🟢 รับค่าว่ามาจาก Auto Login ไหม ถ้าใช่ให้ใช้ savedId ที่ส่งมา
+    const isAuto = e && e.isAutoLogin;
+    const id = isAuto ? e.savedId : document.getElementById('login-id').value.trim();
 
-    // 1. Validation เบื้องต้น
-    if (!studentId) {
-        showToast('กรุณากรอกรหัสนักเรียนด้วยครับ 📝', 'error');
+    if (!id || id === 'undefined') {
+        showToast('กรุณากรอกรหัสนักเรียน', 'error');
         return;
     }
 
-    // 2. แสดงสถานะกำลังโหลด (Loading State)
+    const btn = document.getElementById('btn-login'); 
     if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = `
-            <div class="flex items-center justify-center gap-2">
-                <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
-                <span>กำลังยืนยันตัวตน...</span>
-            </div>
-        `;
-        lucide.createIcons();
+        btn.disabled = true; 
+        btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Checking...';
     }
 
     try {
-        // 3. ตรวจสอบข้อมูลจาก Database (Firestore) โดยตรง
-        // ใช้ .where('student_id', '==', studentId) เพื่อหาเด็กคนนี้
-        const snapshot = await db.collection('students')
-            .where('student_id', '==', studentId)
-            .get();
+        // ค้นหาข้อมูลนักเรียนจาก Firebase (ไม่ต้องเช็ค PIN เพราะหน้าหลักเช็คมาให้แล้ว)
+        const snapshot = await db.collection('students').where('student_id', '==', id).get();
 
-        // 🚨 กรณีที่ 1: ไม่พบข้อมูล (อาจจะพิมพ์ผิด หรือ ครูลบออกไปแล้ว)
         if (snapshot.empty) {
-            console.warn(`[Login] Student ID ${studentId} not found or deleted.`);
-            
-            // ล้าง Session เก่าทิ้งทันที กันเด็กเข้าหน้า Dashboard ได้
-            localStorage.removeItem('student_session');
-            
-            // รีเซ็ตหน้าจอ Login ให้พร้อมพิมพ์ใหม่
-            if (idInput) {
-                idInput.value = "";
-                idInput.readOnly = false;
-                idInput.classList.remove('bg-slate-200', 'text-slate-500', 'cursor-not-allowed');
-            }
-            
-            showToast('ไม่พบรหัสนักเรียนนี้ในระบบ หรือบัญชีถูกระงับ! ❌', 'error');
-            
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = 'เข้าสู่ระบบ';
-            }
-            return;
+            throw new Error('ไม่พบข้อมูลนักเรียนในระบบ');
         }
 
-        // 🚨 กรณีที่ 2: พบข้อมูลนักเรียน
+        // 3. 🚨 จุดสำคัญ: ถ้าไม่ใช่ Auto Login ถึงจะเช็ค PIN
+        if (!isAuto) {
+            let matched = false;
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                // เช็ค PIN ว่าตรงกันไหม (เผื่อทั้งแบบตัวเลขและข้อความ)
+                if (data.pin == pin || data.pin == parseInt(pin)) {
+                    matched = true;
+                }
+            });
+
+            if (!matched && pinInput) { // ถ้าหน้านั้นมีช่อง PIN แต่กรอกผิด
+                throw new Error('รหัสผ่าน (PIN) ไม่ถูกต้อง');
+            }
+        }
+
+        // 4. ถ้าผ่านหมดแล้ว (หรือเป็น Auto Login) ให้เข้าระบบตามปกติ
         const studentDoc = snapshot.docs[0];
-        const studentData = studentDoc.data();
+        currentStudent = { docId: studentDoc.id, ...studentDoc.data() };
+        // =====================================
+        // 🟢 เพิ่มโค้ดนำชื่อและรหัสไปโชว์ที่มุมบนขวา
+        // =====================================
+        const shNameEl = document.getElementById('sh-name');
+        const shIdEl = document.getElementById('sh-id');
+        const shHeaderEl = document.getElementById('student-header-info');
         
-        // เก็บข้อมูลลงตัวแปร Global ของระบบ
-        currentStudent = { 
-            __backendId: studentDoc.id, 
-            ...studentData 
-        };
-
-        // 4. บันทึก Session ลงในเครื่องนักเรียน (จำล็อกอิน)
-        const sessionData = {
-            id: currentStudent.student_id,
-            name: currentStudent.student_name,
-            docId: studentDoc.id,
-            lastLogin: new Date().toISOString()
-        };
-        localStorage.setItem('student_session', JSON.stringify(sessionData));
-
-        // 5. ปรับปรุง UI หน้า Login ให้ดูเหมือนล็อกอินแล้ว
-        if (idInput) {
-            idInput.readOnly = true;
-            idInput.classList.add('bg-slate-200', 'text-slate-500', 'cursor-not-allowed');
+        if (shNameEl && shIdEl && shHeaderEl) {
+            shNameEl.textContent = currentStudent.student_name || currentStudent.name || "นักเรียน";
+            shIdEl.textContent = "รหัส: " + currentStudent.student_id;
+            shHeaderEl.classList.remove('hidden'); // ลบคลาส hidden เพื่อให้กล่องแสดงขึ้นมา
         }
+        // =====================================
+        // โค้ดส่วนที่เหลือ (ดึงข้อมูลวิชา, ปิดหน้า Login) ให้คงไว้ตามเดิม...
+        console.log("Login Success:", currentStudent.student_name);
+        
+        // ตัวอย่างการปิดหน้า Login (ปรับตาม id ที่คุณครูใช้)
+        const loginOverlay = document.getElementById('view-login') || document.getElementById('login-overlay');
+        if (loginOverlay) loginOverlay.classList.add('hidden');
+        
+        // ดึงข้อมูลวิชาต่อ...
+        fetchStudentProfiles(id);
 
-        showToast(`ยินดีต้อนรับครับ คุณ${currentStudent.student_name} 🎉`, 'success');
-
-        // 6. เปลี่ยนหน้าจอ และโหลดข้อมูลที่เกี่ยวข้อง
-        // เก็บข้อมูลทุกวิชาที่เด็กคนนี้เรียน (กรณีระบบจับคู่หลาย Course)
-        studentProfiles = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
-
-        // อัปเดตข้อมูลนักเรียนที่แถบ Header ด้านบน
-        const headerInfo = document.getElementById('student-header-info');
-        if (headerInfo) {
-            headerInfo.classList.remove('hidden');
-            document.getElementById('sh-name').innerText = currentStudent.student_name || currentStudent.name || 'นักเรียน';
-            document.getElementById('sh-id').innerText = currentStudent.student_id || '';
-        }
-
-        // ดึงข้อมูลรายวิชาและสื่อการสอน
-        await fetchCoursesAndMaterials();
-
-    } catch (error) {
-        console.error("Login System Error:", error);
-        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ 🌐', 'error');
-    } finally {
-        // คืนค่าปุ่มให้กลับมาปกติ
-        if (btn && !currentStudent) {
+    } catch (err) {
+        showToast(err.message, 'error');
+        if (btn) {
             btn.disabled = false;
-            btn.innerHTML = 'เข้าสู่ระบบ';
-            lucide.createIcons();
-        } else if (btn && currentStudent) {
-            btn.innerHTML = 'เข้าสู่ระบบสำเร็จ';
+            btn.innerHTML = 'ถัดไป <i data-lucide="arrow-right" class="w-4 h-4"></i>';
         }
+        lucide.createIcons();
     }
 }
-
 
 // 🟢 1. วางทับฟังก์ชัน renderCourseSelection เดิม
 function renderCourseSelection() {
@@ -721,6 +700,33 @@ async function submitWorksheet() {
     }
 }
 
+// ==========================================
+// 🟢 เพิ่มฟังก์ชัน fetchStudentProfiles ที่ขาดหายไป
+// ==========================================
+async function fetchStudentProfiles(studentId) {
+    try {
+        // 1. ดึงข้อมูลโปรไฟล์ของนักเรียน (รองรับกรณี 1 คนลงทะเบียนหลายวิชา = มีหลาย Document)
+        const snapshot = await db.collection('students').where('student_id', '==', String(studentId)).get();
+        
+        // 2. นำข้อมูลมาเก็บใส่ Array studentProfiles
+        studentProfiles = snapshot.docs.map(doc => ({ 
+            docId: doc.id, 
+            ...doc.data() 
+        }));
+
+        // 3. ไปดึงข้อมูลสื่อการสอนและรายวิชาต่อ
+        if (typeof fetchCoursesAndMaterials === 'function') {
+            await fetchCoursesAndMaterials();
+        } else {
+            console.error("ไม่พบฟังก์ชัน fetchCoursesAndMaterials");
+            showToast('ระบบดึงข้อมูลสื่อไม่สมบูรณ์', 'error');
+        }
+
+    } catch (error) {
+        console.error("Error fetching student profiles:", error);
+        showToast('เกิดข้อผิดพลาดในการดึงข้อมูลรายวิชา', 'error');
+    }
+}
 
 // 🟢 3. วางทับฟังก์ชัน fetchCoursesAndMaterials เดิม
 async function fetchCoursesAndMaterials() {

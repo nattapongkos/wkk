@@ -414,3 +414,51 @@ select option { background-color: #ffffff; color: #1e293b; }
 .bg-warm-gradient {
     background: linear-gradient(135deg, #f43f5e 0%, #fb923c 50%, #facc15 100%);
 }
+
+
+/* Quest Map Styles */
+.quest-node {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.quest-circle {
+  width: 50px;
+  height: 50px;
+  border: 4px solid black;
+  border-radius: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 4px 4px 0px #000;
+  font-weight: 900;
+  position: relative;
+  z-index: 2;
+}
+
+.quest-content {
+  background: white;
+  border: 3px solid black;
+  border-bottom-width: 6px;
+  border-radius: 1.5rem;
+  padding: 1rem 1.5rem;
+  flex: 1;
+  box-shadow: 5px 5px 0px rgba(0,0,0,0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* สถานะต่างๆ */
+.quest-completed .quest-circle { background: #10b981; color: white; } /* เขียว */
+.quest-active .quest-circle { background: #ffd200; color: black; animation: pulse-yellow 2s infinite; } /* เหลือง (กำลังเรียน) */
+.quest-locked .quest-circle { background: #cbd5e1; color: #64748b; } /* เทา (ยังไม่ปลดล็อก) */
+
+@keyframes pulse-yellow {
+  0% { transform: scale(1); box-shadow: 4px 4px 0px #000; }
+  50% { transform: scale(1.1); box-shadow: 6px 6px 0px #000; }
+  100% { transform: scale(1); box-shadow: 4px 4px 0px #000; }
+}

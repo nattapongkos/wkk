@@ -137,8 +137,8 @@ window.onload = async () => {
   const initMobBtn = document.getElementById('mob-nav-dashboard');
   if (initMobBtn) initMobBtn.classList.add('active');
 
-  // 🚨 ลบบรรทัด setInterval ออกไปเลย เพื่อหยุดการสูบ Data 🚨
-  // setInterval(loadAllDataSilent, 15000);
+  // 🚨 เพิ่ม 1 บรรทัดนี้เข้าไป เพื่อบังคับให้ระบบแสดงหน้า Dashboard เมื่อโหลดเสร็จ 🚨
+  switchTab(currentTab); 
 };
 
 function hideLoading() {
@@ -327,35 +327,44 @@ function goBackToHome() {
   window.location.href = 'teacher.html';
 }
 
-function switchTab(tab) {
-  // 🟢 เปลี่ยนเส้นทาง tab เก่าไปยังศูนย์ควบคุมชั้นเรียนใหม่ (แท็บย่อย)
-  if (["grading", "stats", "export", "attendance"].includes(tab)) {
-    if (typeof switchSubTab === 'function') switchSubTab(tab);
-    tab = "classroom-center";
-  }
-
-  currentTab = tab;
-  // 🌟 อัปเดต Array ใหม่ให้ตรงกับเมนูหลัก
-  [
-    "dashboard",
-    "submissions",
-    "announcements",
-    "system-settings",
-    "classroom-center"].forEach((t) => {
-    const el = document.getElementById(`panel-${t}`);
-    if (el) el.classList.toggle("hidden", t !== tab);
+function switchTab(tabName) {
+  currentTab = tabName;
+  const panels = [
+      'dashboard', 'submissions', 'classroom-center', 
+      'announcements', 'system-settings', 'quest' // <--- เพิ่ม 'quest' เข้าไปในอาร์เรย์
+  ];
+  
+  // ซ่อนทุกหน้า และลบสถานะปุ่ม Active
+  panels.forEach(panel => {
+      const el = document.getElementById('panel-' + panel);
+      if (el) {
+          el.classList.add('hidden');
+          el.classList.remove('slide-up');
+      }
+      
+      const navBtn = document.getElementById('nav-' + panel);
+      if (navBtn) navBtn.classList.remove('active', 'text-indigo-600', 'bg-indigo-50');
+      
+      const mobBtn = document.getElementById('mob-nav-' + panel);
+      if (mobBtn) mobBtn.classList.remove('active', 'text-indigo-600');
   });
 
-  // อัปเดต Desktop Nav active state
-  document.querySelectorAll('.nav-tab-btn').forEach(btn => btn.classList.remove('active'));
-  const activeDesktopBtn = document.getElementById(`nav-${tab}`);
-  if (activeDesktopBtn) activeDesktopBtn.classList.add('active');
+  // แสดงหน้าที่เลือก
+  const targetPanel = document.getElementById('panel-' + tabName);
+  if (targetPanel) {
+      targetPanel.classList.remove('hidden');
+      targetPanel.classList.remove('slide-up');
+      // Force reflow แล้วค่อย add animation กลับ เพื่อ re-trigger ทุกครั้ง
+      void targetPanel.offsetWidth;
+      targetPanel.classList.add('slide-up');
+  }
 
-  // อัปเดต Mobile Nav active state
-  document.querySelectorAll('.mob-nav-btn').forEach(btn => btn.classList.remove('active'));
-  const activeMobBtn = document.getElementById(`mob-nav-${tab}`);
-  if (activeMobBtn) activeMobBtn.classList.add('active');
-
+  // ไฮไลต์ปุ่ม (ถ้ามี)
+  const targetNavBtn = document.getElementById('nav-' + tabName);
+  if (targetNavBtn) targetNavBtn.classList.add('active', 'text-indigo-600', 'bg-indigo-50');
+  
+  const targetMobBtn = document.getElementById('mob-nav-' + tabName);
+  if (targetMobBtn) targetMobBtn.classList.add('active', 'text-indigo-600');
   refreshCurrentTab();
 }
 
@@ -376,6 +385,12 @@ function refreshCurrentTab() {
     if (exportLabel) {
       exportLabel.textContent = currentClass === "all" ? "รวมทุกห้อง" : currentClass;
     }
+  }
+
+  // 🎯 🌟 [เพิ่ม 4 บรรทัดนี้ลงไปเพื่อให้ระบบโหลดห้องและเควสต์] 🌟 🎯
+  if (currentTab === "quest") {
+      if (typeof populateQuestRoomDropdown === 'function') populateQuestRoomDropdown();
+      if (typeof loadQuestsByRoom === 'function') loadQuestsByRoom();
   }
 
   lucide.createIcons();
@@ -663,28 +678,48 @@ function renderTeacherSubmissions() {
     let max = 10;
     const isResubmitDesc = item.description && String(item.description).includes("[ส่งซ้ำ]");
 
-    try {
-      const scs = JSON.parse(student.scores || "[]");
-      const found = scs.find((s) => s.name === item.title);
-      
-      if (found && found.score !== null && found.score !== "") {
-        score = found.score;
-        if (found.graded_at && new Date(item.submitted_at) > new Date(found.graded_at)) {
-          bucket = "resubmit";
-        } else {
-          bucket = "graded";
+        // 💡 1. หารหัสหมวดหมู่เพื่อดึงคะแนนเต็ม (Max Score) แบบ Smart Matching
+        let targetCategoryName = item.score_category || item.category || item.title;
+        const course = courses.find((c) => c.course_name === item.subject || String(c.course_id) === String(item.course_id));
+        
+        if (course) {
+            try {
+                const cats = JSON.parse(course.score_categories || "[]");
+                let matchedCat = cats.find(c => c.name.trim() === targetCategoryName.trim());
+                if (!matchedCat && item.title) {
+                    matchedCat = cats.find(c => c.name.trim() === item.title.trim() || item.title.includes(c.name.trim()));
+                }
+                if (matchedCat) {
+                    targetCategoryName = matchedCat.name;
+                    max = parseFloat(matchedCat.max);
+                }
+            } catch (e) {}
         }
-      } else {
-        bucket = isResubmitDesc ? "resubmit" : "pending";
-      }
 
-      const course = courses.find((c) => c.course_name === item.subject || c.course_id === item.course_id);
-      if (course) {
-        const cats = JSON.parse(course.score_categories || "[]");
-        const cat = cats.find((c) => c.name === item.title);
-        if (cat) max = cat.max;
-      }
-    } catch (e) {}
+        // 💡 2. ตรวจสอบว่าตรวจหรือยัง (ดูจากคะแนนนักเรียน ควบคู่กับสถานะของชิ้นงาน)
+        try {
+            const scs = JSON.parse(student.scores || "[]");
+            const found = scs.find((s) => s.name === targetCategoryName);
+            
+            if (found && found.score !== null && found.score !== "") {
+                score = found.score; // ดึงคะแนนมาแสดงที่ปุ่ม
+                // เช็คเวลาว่างานถูกส่งมา "หลัง" จากที่ตรวจไปล่าสุดหรือเปล่า
+                if (found.graded_at && new Date(item.submitted_at) > new Date(found.graded_at)) {
+                    bucket = "resubmit"; 
+                } else {
+                    bucket = "graded"; 
+                }
+            } else if (item.status === "graded") {
+                // เผื่อกรณีหาในตารางไม่เจอ แต่ตัวงานถูกประทับตราว่าตรวจแล้ว
+                bucket = "graded";
+                score = item.score || 0;
+                if (item.graded_at && new Date(item.submitted_at) > new Date(item.graded_at)) {
+                    bucket = "resubmit";
+                }
+            } else {
+                bucket = isResubmitDesc ? "resubmit" : "pending";
+            }
+        } catch (e) {}
 
     if (bucket === "pending") pendingCount++;
     else if (bucket === "resubmit") resubmitCount++;
@@ -1851,7 +1886,7 @@ async function openGradeModal(sid) {
     const elGradeTitle = document.getElementById("grade-title");
     if (elGradeTitle) elGradeTitle.textContent = `ตรวจงาน: ${item.student_name || item.student_id}`;
     
-    // 💡 1. วิ่งไปโหลดข้อมูล "ใบงานต้นฉบับ" จาก Database ทันที
+    // 💡 1. โหลดข้อมูล "ใบงานต้นฉบับ" จาก Database
     const matId = item.worksheet_id || item.material_id || item.assignment_id;
     let matData = null;
     if (matId) {
@@ -1861,38 +1896,53 @@ async function openGradeModal(sid) {
         } catch (e) { console.error("ดึงข้อมูลใบงานต้นฉบับไม่สำเร็จ:", e); }
     }
 
-    // 💡 2. ค้นหาหมวดหมู่คะแนนที่ถูกต้อง (ดึงจากต้นฉบับใบงานเป็นหลัก)
+    // 💡 2. ระบบค้นหา "หมวดหมู่คะแนนอัจฉริยะ" (ดึงจากหน้าตั้งค่าวิชาโดยตรง)
+    let maxScore = 10; // ค่าเริ่มต้น
     let targetCategoryName = item.score_category || item.category;
     if (!targetCategoryName && matData) {
         targetCategoryName = matData.score_category || matData.category;
     }
-    targetCategoryName = targetCategoryName || item.title; 
-
-    currentGradeItem.resolved_category = targetCategoryName;
-
-    // 💡 3. ดึงคะแนนเต็มจากโครงสร้างให้ตรงกับวิชาปัจจุบัน
-    let maxScore = 10; // ค่าเริ่มต้น
+    
     const course = courses.find((c) => c.course_name === item.subject || String(c.course_id) === String(item.course_id));
+    let matchedCat = null;
+
     if (course) {
         try {
             const cats = JSON.parse(course.score_categories || "[]");
-            // ค้นหาหมวดหมู่ที่ตรงกับใบงานนี้
-            const cat = cats.find((c) => c.name && targetCategoryName && c.name.trim() === targetCategoryName.trim());
-            if (cat && cat.max) {
-                maxScore = parseFloat(cat.max); // เจอแล้ว! อัปเดตคะแนนเต็มตามโครงสร้าง
-            } else {
-                 console.warn("ไม่พบหมวดหมู่คะแนนที่ตรงกันในโครงสร้างวิชา", targetCategoryName);
+            // 2.1 ลองหาว่าชิ้นงานนี้ตรงกับช่องคะแนนไหนที่ครูตั้งไว้แบบเป๊ะๆ
+            if (targetCategoryName) {
+                matchedCat = cats.find(c => c.name.trim() === targetCategoryName.trim());
             }
-        } catch (e) { console.error("Parse score categories failed:", e); }
-    } else {
-        console.warn("ไม่พบรายวิชาที่ผูกกับงานนี้", item.subject, item.course_id);
+            // 2.2 🌟 ถ้าไม่เจอ ลองเทียบแบบหลวมๆ จากชื่องานที่เด็กส่งมา (แก้ไขปัญหาชื่อไม่ตรง)
+            if (!matchedCat && item.title) {
+                matchedCat = cats.find(c => c.name.trim() === item.title.trim() || item.title.includes(c.name.trim()));
+            }
+
+            // 2.3 ถ้าเจอหมวดหมู่แล้ว ดึงคะแนนจากหน้าเว็บมาใช้เลย!
+            if (matchedCat) {
+                targetCategoryName = matchedCat.name; // บังคับชื่อให้ตรงกับช่องในตาราง (ป้องกันช่องคะแนนงอก)
+                maxScore = parseFloat(matchedCat.max); // ดึงคะแนน 5 จากหน้าตั้งค่ามาใช้
+            }
+        } catch (e) { console.error("Parse error:", e); }
     }
+
+    // 💡 3. ถ้าหาในช่องคะแนนไม่เจอจริงๆ ค่อยไปดูในข้อมูลใบงานหรือชิ้นงาน
+    if (!matchedCat) {
+        if (matData && (matData.max_score || matData.score)) {
+            maxScore = parseFloat(matData.max_score || matData.score);
+        } else if (item.max_score || item.full_score) {
+            maxScore = parseFloat(item.max_score || item.full_score);
+        }
+    }
+
+    // สรุปชื่อหมวดหมู่สุดท้ายที่จะใช้บันทึกคะแนน
+    targetCategoryName = targetCategoryName || item.title; 
+    currentGradeItem.resolved_category = targetCategoryName;
     
-    // 💡 4. แสดงคะแนนเต็มที่หน้าจอ Popup (ตรงจุดที่คุณครูวงมาเลยครับ!)
+    // 💡 4. แสดงคะแนนเต็มที่หน้าจอ Popup และตั้งค่าลิมิตให้ช่องกรอก
     const maxLabel = document.getElementById("grade-modal-max");
-    if (maxLabel) maxLabel.textContent = `คะแนนเต็ม: ${maxScore}`; // อัปเดตข้อความตรงนี้
+    if (maxLabel) maxLabel.textContent = `คะแนนเต็ม: ${maxScore}`; 
     
-    // ตั้งค่าลิมิตช่องกรอกคะแนน และดึงคะแนนเก่า (ถ้าเคยตรวจแล้ว)
     const inputObj = document.getElementById("grade-input-score") || document.getElementById("grade-score");
     if (inputObj) {
         inputObj.max = maxScore;
@@ -3345,25 +3395,7 @@ async function loadSystemToggles() {
     if (doc.exists) {
       settings = doc.data();
 
-      // 🌟 จุดที่แก้ไข: ดึงค่า URL รูปภาพมาแสดงในช่อง Input และกล่อง Preview ให้ถูกต้อง
-      if (document.getElementById("setting-mood-bg")) {
-        document.getElementById("setting-mood-bg").value =
-          settings.mood_bg_url || "";
-        document.getElementById("preview-mood").src =
-          settings.mood_bg_url || ""; // ดึงรูปมาแสดง
-      }
-      if (document.getElementById("setting-profile-bg")) {
-        document.getElementById("setting-profile-bg").value =
-          settings.profile_bg_url || "";
-        document.getElementById("preview-profile").src =
-          settings.profile_bg_url || ""; // ดึงรูปมาแสดง
-      }
-      if (document.getElementById("setting-assign-img")) {
-        document.getElementById("setting-assign-img").value =
-          settings.assign_img_url || "";
-        document.getElementById("preview-assign").src =
-          settings.assign_img_url || ""; // ดึงรูปมาแสดง
-      }
+      
     } else {
       systemFeatures.forEach((f) => (settings[f.id] = true));
     }
@@ -3413,21 +3445,7 @@ async function saveSystemToggles() {
     });
   }
 
-  // 2. 🌟 ดึงค่า URL ภาพพื้นหลังจาก Input ทั้ง 3 ช่อง เพื่อเซฟ
-  const moodBgEl = document.getElementById("setting-mood-bg");
-  if (moodBgEl) {
-    payload.mood_bg_url = moodBgEl.value.trim();
-  }
-
-  const profileBgEl = document.getElementById("setting-profile-bg");
-  if (profileBgEl) {
-    payload.profile_bg_url = profileBgEl.value.trim();
-  }
-
-  const assignImgEl = document.getElementById("setting-assign-img");
-  if (assignImgEl) {
-    payload.assign_img_url = assignImgEl.value.trim();
-  }
+ 
 
   // 3. ส่งข้อมูลไปบันทึกที่ Firebase
   try {
@@ -4112,7 +4130,6 @@ function switchSubTab(tabName) {
     if(tabName === 'grading' && typeof renderGradingTable === 'function') setTimeout(renderGradingTable, 100);
 }
 
-// 🟢 ฟังก์ชันสำหรับอัปเดตตัวเลขแจ้งเตือนงานค้าง
 function updateGlobalBadges() {
     let pendingCount = 0;
     let resubmitCount = 0;
@@ -4123,35 +4140,49 @@ function updateGlobalBadges() {
         if (!student) return;
 
         let bucket = "pending";
-        const isResubmitDesc = item.description && String(item.description).includes("[ส่งซ้ำ]");
+            const isResubmitDesc = item.description && String(item.description).includes("[ส่งซ้ำ]");
 
-        try {
-            const scs = JSON.parse(student.scores || "[]");
-            const found = scs.find((s) => s.name === item.title);
-            if (found && found.score !== null && found.score !== "") {
-                if (found.graded_at && new Date(item.submitted_at) > new Date(found.graded_at)) {
-                    bucket = "resubmit";
-                } else {
-                    bucket = "graded";
-                }
-            } else {
-                bucket = isResubmitDesc ? "resubmit" : "pending";
+            let targetCategoryName = item.score_category || item.category || item.title;
+            const course = courses.find((c) => c.course_name === item.subject || String(c.course_id) === String(item.course_id));
+            if (course) {
+                try {
+                    const cats = JSON.parse(course.score_categories || "[]");
+                    let matchedCat = cats.find(c => c.name.trim() === targetCategoryName.trim());
+                    if (!matchedCat && item.title) {
+                        matchedCat = cats.find(c => c.name.trim() === item.title.trim() || item.title.includes(c.name.trim()));
+                    }
+                    if (matchedCat) targetCategoryName = matchedCat.name;
+                } catch (e) {}
             }
-        } catch (e) {}
 
+            try {
+                const scs = JSON.parse(student.scores || "[]");
+                const found = scs.find((s) => s.name === targetCategoryName);
+                if (found && found.score !== null && found.score !== "") {
+                    if (found.graded_at && new Date(item.submitted_at) > new Date(found.graded_at)) {
+                        bucket = "resubmit";
+                    } else {
+                        bucket = "graded";
+                    }
+                } else if (item.status === "graded") {
+                    bucket = "graded";
+                    if (item.graded_at && new Date(item.submitted_at) > new Date(item.graded_at)) bucket = "resubmit";
+                } else {
+                    bucket = isResubmitDesc ? "resubmit" : "pending";
+                }
+            } catch (e) {}
+            
         if (bucket === "pending") pendingCount++;
         else if (bucket === "resubmit") resubmitCount++;
         else if (bucket === "graded") gradedCount++;
     });
 
-    // อัปเดตตัวเลขที่เมนูด้านซ้าย (ศูนย์ควบคุม)
     const dashBadge = document.getElementById("dash-badge-pending");
     if (dashBadge) {
         const total = pendingCount + resubmitCount;
-        dashBadge.textContent = total > 0 ? total : ""; // ถ้าไม่มีงานจะซ่อนตัวเลขไว้
+        dashBadge.textContent = total > 0 ? total : ""; 
     }
     
-    // อัปเดตตัวเลขในแท็บย่อย (รอตรวจ, ส่งซ้ำ, ตรวจแล้ว)
     const bp = document.getElementById("badge-pending");
     if (bp) bp.textContent = pendingCount;
     const br = document.getElementById("badge-resubmit");
@@ -4698,4 +4729,144 @@ function toggleLineNotify(isChecked) {
 }
 
 
+// ==========================================
+// 🗺️ ระบบ Quest Map (แผนที่ภารกิจ) - Teacher
+// ==========================================
 
+// เก็บ Listener ปัจจุบันเพื่อลบออกเมื่อเปลี่ยนห้อง
+let currentQuestListenerRef = null;
+
+// เพิ่มฟังก์ชันสำหรับดึงข้อมูลห้องมาแสดงใน Dropdown
+function populateQuestRoomDropdown() {
+    const select = document.getElementById('quest-room-select');
+    if (!select) return;
+    
+    // ดึงห้องจากข้อมูลนักเรียนที่มีอยู่
+    const uniqueRooms = [...new Set(allStudents.map((s) => s.classroom))]
+        .filter((c) => c && c.trim() !== "")
+        .sort();
+        
+    let optionsHtml = '<option value="all">รวมทุกห้อง (Global)</option>';
+    uniqueRooms.forEach(room => {
+        optionsHtml += `<option value="${room}">${room}</option>`;
+    });
+    
+    select.innerHTML = optionsHtml;
+}
+
+// 1. ดึงข้อมูลมาแสดงแบบ Realtime ตามห้องที่เลือก
+function loadQuestsByRoom() {
+    const roomSelect = document.getElementById('quest-room-select');
+    const rawRoomId = roomSelect ? roomSelect.value : 'all';
+    
+    // 🌟 แปลงชื่อห้องให้ปลอดภัยสำหรับ Firebase
+    const roomId = rawRoomId === 'all' ? 'all' : rawRoomId.replace(/[\/\.]/g, "_");
+    
+    // ปิดการดักฟังอันเก่า (ถ้ามี)
+    if (currentQuestListenerRef) {
+        currentQuestListenerRef.off();
+    }
+    
+    // สร้าง Reference ตามโครงสร้างใหม่
+    const path = `quest_map/quests/${roomId}`;
+    currentQuestListenerRef = firebase.database().ref(path);
+    
+    currentQuestListenerRef.on('value', (snapshot) => {
+        const listEl = document.getElementById('teacher-quest-list');
+        if (!listEl) return;
+        
+        const data = snapshot.val();
+        if (!data) {
+            listEl.innerHTML = '<div class="text-center py-6 text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">ยังไม่มีภารกิจ พิมพ์ชื่อด่านด้านบนแล้วกดเพิ่มเลย!</div>';
+            return;
+        }
+
+        // แปลงข้อมูลและเรียงตามเวลาที่สร้าง
+        const quests = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+        quests.sort((a, b) => a.timestamp - b.timestamp);
+
+        let html = '';
+        quests.forEach((q, index) => {
+            const isCompleted = q.status === 'completed';
+            const isActive = q.status === 'active';
+            
+            let statusBadge = isCompleted ? '<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">✅ ผ่านแล้ว</span>' : 
+                              isActive ? '<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold">🔥 วันนี้เรียน</span>' : 
+                              '<span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[10px] font-bold">🔒 ยังไม่ปลดล็อก</span>';
+
+            html += `
+            <div class="flex items-center justify-between p-4 border-2 rounded-xl transition-all ${isActive ? 'border-amber-400 bg-amber-50' : 'border-slate-100 bg-white'}">
+                <div class="flex items-center gap-4">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm bg-slate-200 text-slate-600">
+                        ${index + 1}
+                    </div>
+                    <div>
+                        <p class="font-bold text-slate-800 text-sm md:text-base">${q.title}</p>
+                        <div class="mt-1">${statusBadge}</div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <select onchange="updateQuestStatus('${roomId}', '${q.id}', this.value)" class="text-xs md:text-sm font-bold border-2 border-slate-200 rounded-lg px-2 py-2 outline-none cursor-pointer focus:border-indigo-500 bg-white">
+                        <option value="locked" ${q.status === 'locked' ? 'selected' : ''}>🔒 ล็อกด่าน</option>
+                        <option value="active" ${q.status === 'active' ? 'selected' : ''}>🔥 เปิดเรียนวันนี้</option>
+                        <option value="completed" ${q.status === 'completed' ? 'selected' : ''}>✅ ติ๊กผ่านแล้ว</option>
+                    </select>
+                    <button onclick="deleteQuest('${roomId}', '${q.id}')" class="text-red-500 bg-red-50 hover:bg-red-500 hover:text-white p-2 rounded-lg transition-colors border-2 border-transparent hover:border-red-600">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>`;
+        });
+        listEl.innerHTML = html;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    });
+}
+
+
+// 2. ฟังก์ชันเพิ่มภารกิจใหม่
+function addQuest() {
+    const input = document.getElementById('quest-title-input');
+    const title = input.value.trim();
+    if (!title) {
+        if (typeof Swal !== 'undefined') Swal.fire('แจ้งเตือน', 'กรุณาพิมพ์ชื่อภารกิจก่อนครับ', 'warning');
+        return;
+    }
+    
+    const rawRoomId = document.getElementById('quest-room-select').value || 'all';
+    
+    // 🌟 แปลงชื่อห้องให้ปลอดภัยสำหรับ Firebase
+    const roomId = rawRoomId === 'all' ? 'all' : rawRoomId.replace(/[\/\.]/g, "_");
+
+    const newQuestRef = firebase.database().ref(`quest_map/quests/${roomId}`).push();
+    newQuestRef.set({
+        title: title,
+        status: 'locked',
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+    }).then(() => {
+        input.value = ''; 
+    });
+}
+
+// 3. ฟังก์ชันอัปเดตสถานะ
+function updateQuestStatus(roomId, id, newStatus) {
+    firebase.database().ref(`quest_map/quests/${roomId}/${id}`).update({ status: newStatus });
+}
+
+// 4. ฟังก์ชันลบด่าน
+function deleteQuest(roomId, id) {
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: 'ลบภารกิจนี้?',
+            text: "ลบแล้วกู้คืนไม่ได้นะ!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonText: 'ลบเลย'
+        }).then((result) => {
+            if (result.isConfirmed) firebase.database().ref(`quest_map/quests/${roomId}/${id}`).remove();
+        });
+    } else {
+        if(confirm('ยืนยันการลบภารกิจนี้?')) firebase.database().ref(`quest_map/quests/${roomId}/${id}`).remove();
+    }
+}
