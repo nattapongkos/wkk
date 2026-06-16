@@ -258,28 +258,11 @@
       id="auth-login-screen"
       class="fixed inset-0 z-[200] sunburst-bg flex flex-col items-center overflow-y-auto"
     >
-      <div class="m-auto w-full flex flex-col items-center py-10 px-4">
+     <div class="w-full h-screen flex flex-col items-center justify-center p-0">
         
-        <div class="w-full max-w-sm mb-6 animate-float-slow">
-          <div class="bg-white rounded-3xl p-5 border-4 border-black shadow-[8px_8px_0px_#000] relative">
-            <div class="absolute -top-5 -left-4 bg-[#f43f5e] border-2 border-black rounded-full w-10 h-10 flex items-center justify-center text-white text-lg shadow-[2px_2px_0px_#000] transform -rotate-12">
-              👋
-            </div>
-            <div class="absolute -bottom-4 -right-3 bg-[#009de0] border-2 border-black rounded-full w-10 h-10 flex items-center justify-center text-white text-lg shadow-[2px_2px_0px_#000] transform rotate-12">
-              💡
-            </div>
-            <h3 class="text-lg font-black text-center text-slate-800 mb-2 uppercase tracking-widest">
-              ยินดีต้อนรับสู่ห้องเรียน!
-            </h3>
-            <p id="random-quote-text" class="text-center text-slate-600 font-bold text-sm bg-slate-50 p-3 rounded-xl border-2 border-dashed border-slate-300 min-h-[60px] flex items-center justify-center">
-              กำลังโหลดคำคม...
-            </p>
-          </div>
-        </div>
+        
 
-        <div
-          class="bg-white p-6 sm:p-8 rounded-[2.5rem] w-full max-w-sm border-4 border-black shadow-[12px_12px_0px_#000] relative overflow-hidden slide-up"
-        >
+        <div class="bg-white p-6 sm:p-12 w-full h-full flex flex-col items-center justify-center relative overflow-hidden slide-up">
           <div class="flex justify-center gap-2 absolute top-0 left-0 w-full pt-2">
             <div class="w-10 h-3 bg-[#f43f5e] border-2 border-black rounded-b-md"></div>
             <div class="w-10 h-3 bg-[#009de0] border-2 border-black rounded-b-md"></div>
@@ -635,15 +618,15 @@
               </div>
 
               <div class="bg-black/90 text-white rounded-md px-6 py-3 flex gap-6 font-black uppercase text-sm border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,0.2)] transform rotate-1">
-                <button onclick="goToHome()" class="text-[#ffd200] hover:text-white"><i data-lucide="home" class="w-4 h-4 inline pb-0.5"></i> HOME</button>
-                <button onclick="switchTab('submit')" class="hover:text-[#ffd200]">ASSIGNMENTS</button>
-                <button onclick="switchTab('halloffame')" class="hover:text-[#ffd200]">HALL OF FAME</button>
+                <button onclick="goToHome()" class="text-[#ffd200] hover:text-white"><i data-lucide="home" class="w-4 h-4 inline pb-0.5"></i> หน้าแรก</button>
+                <button onclick="switchTab('submit')" class="hover:text-[#ffd200]">ส่งงาน</button>
+                <button onclick="switchTab('halloffame')" class="hover:text-[#ffd200]">แสดงผลงาน</button>
               </div>
 
               <!-- ปุ่มตระกร้า/ข้อมูลเหรียญ -->
               <button onclick="switchTab('shop')" class="lego-btn-blue px-6 py-3 flex items-center gap-3 text-sm transform -rotate-1 hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,0.2)]">
                 <i data-lucide="coins" class="w-5 h-5 text-yellow-300"></i>
-                MY COINS: <span id="user-coins" class="bg-white text-[#009de0] px-3 py-0.5 rounded-full border-2 border-[#009de0] shadow-inner font-black text-sm">0</span>
+                เหรียญ: <span id="user-coins" class="bg-white text-[#009de0] px-3 py-0.5 rounded-full border-2 border-[#009de0] shadow-inner font-black text-sm">0</span>
               </button>
             </div>
 
@@ -821,7 +804,7 @@
           </p>
           
           <button onclick="switchTab('submit'); switchSubTab('hist');" class="mt-auto w-full bg-white hover:bg-slate-200 text-black border-4 border-black font-black text-xs py-3.5 rounded-xl transition-colors uppercase relative z-10 shadow-[4px_4px_0px_#000] active:translate-y-[4px] active:shadow-none flex items-center justify-center gap-2">
-            <i data-lucide="history" class="w-4 h-4"></i> เช็คประวัติ EXP
+            <i data-lucide="history" class="w-4 h-4"></i> เช็คประวัติงาน
           </button>
         </div>
 
@@ -841,7 +824,7 @@
           </p>
           
           <button onclick="openMissingAssignmentsModal()" class="mt-auto w-full bg-slate-900 hover:bg-black text-[#ffd200] border-4 border-black font-black text-xs py-3.5 rounded-xl transition-colors uppercase relative z-10 shadow-[4px_4px_0px_#000] active:translate-y-[4px] active:shadow-none flex items-center justify-center gap-2">
-            <i data-lucide="swords" class="w-4 h-4"></i> ลุยเควสค้าง
+            <i data-lucide="swords" class="w-4 h-4"></i> ลุยงานค้าง
           </button>
         </div>
       </div>

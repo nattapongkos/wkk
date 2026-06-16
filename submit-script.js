@@ -4392,8 +4392,13 @@ async function syncProfileWithGachaData() {
       if (course && course.score_categories) {
         try {
           const cats = JSON.parse(course.score_categories);
-          totalAssignments = cats.length;
-          cats.forEach(cat => {
+          
+          // 🌟 1. กรองเอาเฉพาะงานที่ครูติ๊ก "แสดงในฟอร์มส่งงาน" (allow_submit ไม่เป็น false)
+          const onlineCats = cats.filter(c => c.allow_submit !== false);
+          
+          totalAssignments = onlineCats.length;
+          onlineCats.forEach(cat => {
+            // เช็คว่างานนี้เด็กส่งไปหรือยัง
             if (!submittedTitles.has(cat.name)) {
                 globalMissingAssignments.push(cat);
             }
@@ -4402,13 +4407,14 @@ async function syncProfileWithGachaData() {
       }
     }
 
-    let missingCount = totalAssignments - submittedCount;
-    if (missingCount < 0) missingCount = 0;
+    // 🌟 2. ดึงจำนวนงานค้างจาก Array ที่กรองมาแล้วโดยตรง เพื่อความแม่นยำสูงสุด
+    let missingCount = globalMissingAssignments.length;
 
     const statSubEl = document.getElementById("stat-submitted");
     const statMisEl = document.getElementById("stat-missing");
-    if (statSubEl) statSubEl.innerText = submittedCount;
-    if (statMisEl) statMisEl.innerText = totalAssignments > 0 ? missingCount : "0";
+    
+    if (statSubEl) statSubEl.innerText = submittedCount; // ยอดงานที่ส่งไปแล้วโชว์เหมือนเดิม
+    if (statMisEl) statMisEl.innerText = missingCount; // โชว์ยอดค้างส่งเฉพาะงานที่ครูติ๊ก
 
     // --- 2. คำนวณเหรียญ ---
     let coins = data.coins !== undefined ? data.coins : totalCalculatedScore * 10;

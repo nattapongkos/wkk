@@ -12,7 +12,7 @@ let itemToDeleteSub = null;
 let currentTab = "dashboard";
 let teacherListTab = "pending";
 let currentGradeItem = null;
-let currentClass = "all";
+let currentClass = "none";
 let currentStudentPage = 1;
 
 const studentsPerPage = 10; // แสดงหน้าละ 10 คน (แก้ไขตัวเลขได้ครับ)
@@ -1025,6 +1025,18 @@ function renderGradingTable() {
   const thead = document.getElementById("grading-head");
   const empty = document.getElementById("grading-empty");
   if (!tbody || !thead) return;
+
+  // ✨ ส่วนที่แทรกเพิ่ม: ดักจับถ้ายังไม่ได้เลือกห้อง ✨
+  if (currentClass === "none") {
+    thead.innerHTML = ""; // ล้างหัวตาราง
+    tbody.innerHTML = ""; // ล้างข้อมูลนักเรียน
+    if (empty) {
+      empty.innerHTML = "กรุณาเลือกห้องเรียนเพื่อแสดงตารางคะแนน"; 
+      empty.classList.remove("hidden");
+    }
+    return; // หยุดการทำงาน ไม่ต้องดึงข้อมูลมาแสดง
+  }
+
   const search = (
     document.getElementById("search-student-grading")?.value || ""
   ).toLowerCase();
@@ -1379,7 +1391,7 @@ function updateClassSelector() {
     const classes = [...new Set(allStudents.filter(s => s.course_id === currentCourseId).map(s => s.classroom))].sort(); 
     
     // สร้าง HTML สำหรับตัวเลือก
-    const optionsHtml = `<option value="all">รวมทุกห้อง</option>` + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+    const optionsHtml = `<option value="none" disabled selected>-- เลือกห้องเรียน --</option>` + classes.map(c => `<option value="${c}">${c}</option>`).join('');
     
     // อัปเดตกล่องด้านบน
     globalSelect.innerHTML = optionsHtml; 
@@ -1390,6 +1402,12 @@ function updateClassSelector() {
     if (exportSelect) {
         exportSelect.innerHTML = optionsHtml;
         exportSelect.value = currentClass;
+    }
+    // ✨ ส่วนที่แทรกเพิ่ม: อัปเดตกล่องตรง Scoreboard Matrix ✨
+    const matrixSelect = document.getElementById('matrix-class-select');
+    if (matrixSelect) {
+        matrixSelect.innerHTML = optionsHtml;
+        matrixSelect.value = currentClass;
     }
 }
 
@@ -1411,6 +1429,21 @@ function changeExportClass() {
     if (globalSelect) globalSelect.value = currentClass; // ซิงค์กลับไปด้านบน
     
     refreshCurrentTab();
+}
+
+// ✨ ส่วนที่แทรกเพิ่ม: เมื่อเปลี่ยนห้องจากกล่องใน Scoreboard Matrix ✨
+function changeMatrixClass() {
+    currentClass = document.getElementById('matrix-class-select').value;
+    
+    // ซิงค์การตั้งค่ากลับไปที่กล่องเมนูหลักด้านบน และหน้า Export
+    const globalSelect = document.getElementById('global-class-select');
+    if (globalSelect) globalSelect.value = currentClass;
+    
+    const exportSelect = document.getElementById('export-class-select');
+    if (exportSelect) exportSelect.value = currentClass;
+    
+    currentStudentPage = 1;
+    refreshCurrentTab(); // สั่งรีเฟรชตารางใหม่
 }
 
 // 🌟 อัปเดต ตรรกะตัดเกรด 8 ระดับ
