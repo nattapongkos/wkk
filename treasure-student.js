@@ -71,7 +71,8 @@ window.initTreasureHunt = async function() {
         document.head.appendChild(style);
     }
 
-    const session = localStorage.getItem('student_session');
+    const session = sessionStorage.getItem('student_session');
+    
     if (!session) { 
         trs_showAlert('ยังไม่ได้ล็อกอิน', 'กรุณาล็อกอินเข้าสู่ Student Portal ก่อนใช้งานระบบนี้ครับ', 'error'); 
         setTimeout(() => { window.location.href = 'index.html'; }, 2000); 
@@ -79,8 +80,6 @@ window.initTreasureHunt = async function() {
     }
     trs_user = JSON.parse(session);
     await trs_loadData();
-
-    // 👇 บันทึกว่าโหลดเสร็จเรียบร้อยแล้ว
     isTreasureLoaded = true; 
 };
 
@@ -716,7 +715,7 @@ let liveDropUnsubscribe = null;
 
 window.openGeoQuestMap = async function() {
     if (!trs_user) {
-        const session = localStorage.getItem('student_session');
+        const session = sessionStorage.getItem('student_session');
         if (session) trs_user = JSON.parse(session);
         if (!trs_user) return trs_showAlert('ยังไม่ได้ล็อกอิน', 'กรุณาล็อกอินก่อนเปิดเรดาร์', 'error');
     }
