@@ -101,9 +101,10 @@ async function trs_loadData() {
 
     try {
         const res = await fetch(TRS_GAS_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'get_my_treasures', student_id: String(trs_user.id) })
-        });
+    method: 'POST',
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: 'get_my_treasures', student_id: String(trs_user.id) })
+});
         const json = await res.json();
         
         if (json.status === 'success') {
@@ -526,9 +527,10 @@ async function trs_onSuccess(decodedText, decodedResult) {
 
     try {
         await fetch(TRS_GAS_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'add_piece', student_id: String(trs_user.id), quest_id: questId, piece_num: pieceNum })
-        });
+    method: 'POST',
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: 'add_piece', student_id: String(trs_user.id), quest_id: questId, piece_num: pieceNum })
+});
 
         if (!myData) {
             trs_myTreasures.push({ quest_id: questId, collected_pieces: [pieceNum], is_completed: false });
