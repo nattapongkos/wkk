@@ -47,9 +47,13 @@ if (typeof window.CUSTOM_GPS === 'undefined') {
     }
 })();
 // =================================================================
-
 // 🚨 เปลี่ยนชื่อตัวแปรเป็น TRS_GAS_URL เพื่อป้องกันการชนกับไฟล์ submit-script.js
 var TRS_GAS_URL = 'https://script.google.com/macros/s/AKfycbw300p4oJDcOkKoVBz3IjXd3jNdoPatiPyjfXSnVJofJQs-DT9jQN5htOxc2CpSny-ueQ/exec';
+
+
+// ชื่อ Bucket (เผื่อไว้ใช้กับระบบอื่นที่ต้องอัปโหลดรูป)
+
+// ==========================================
 
 var trs_user = null;
 var trs_quests = [];
@@ -83,50 +87,7 @@ window.initTreasureHunt = async function() {
     isTreasureLoaded = true; 
 };
 
-async function trs_loadData() {
-    const activeContainer = document.getElementById('active-quests');
-    if(activeContainer) activeContainer.innerHTML = '<div class="text-center py-6 text-slate-400 text-sm">กำลังจัดเตรียมพื้นที่ล่าสมบัติ...</div>';
-    if (typeof lucide !== 'undefined') lucide.createIcons();
 
-    // 🌟 1. สั่งเปิด Popup เวทมนตร์ทันที! (ดึงความสนใจเด็กไว้)
-    let loadingAnim = playLegendaryLoading(); 
-
-    // 🌟 2. ให้ระบบแอบดึงข้อมูลเงียบๆ หลังฉาก ในขณะที่เด็กกำลังดูแอนิเมชัน
-    try {
-        const qSnap = await db.collection('treasure_quests').get();
-        trs_quests = qSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } catch(e) { 
-        console.error("Firebase Error: ", e); 
-    }
-
-    try {
-        const res = await fetch(TRS_GAS_URL, {
-    method: 'POST',
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action: 'get_my_treasures', student_id: String(trs_user.id) })
-});
-        const json = await res.json();
-        
-        if (json.status === 'success') {
-            trs_myTreasures = json.data.map(d => ({
-                quest_id: d.quest_id,
-                collected_pieces: d.collected_pieces ? String(d.collected_pieces).split(',').map(Number) : [],
-                is_completed: String(d.is_completed).toLowerCase() === 'true'
-            }));
-        } else { trs_myTreasures = []; }
-    } catch(e) { 
-        console.error("GAS Error: ", e); 
-        trs_myTreasures = []; 
-    }
-
-    // 🌟 3. รอจนกว่าแอนิเมชัน 4 วินาทีจะเล่นจบ (เพื่อความเท่) 
-    // แม้เน็ตจะเร็วโหลดเสร็จใน 1 วิ ก็จะหน่วงเวลาให้ดูแอนิเมชันจบก่อนครับ
-    await loadingAnim; 
-    
-    // 🌟 4. ปิด Popup และแสดงภารกิจทั้งหมดขึ้นมาทันที!
-    closeLegendaryLoading();
-    trs_renderUI();
-}
 
 // ==========================================
 // 🌟 1.5 ตัวแปรเก็บสถานะการเลือกภารกิจ
@@ -509,28 +470,113 @@ window.closeLegendaryLoading = function() {
     }
 }
 
+
+// ==========================================
+// 🌟 ฟังก์ชันโหลดข้อมูลสมบัติ (ใช้ Supabase 100%)
+// ==========================================
+async function trs_loadData() {
+    const activeContainer = document.getElementById('active-quests');
+    if(activeContainer) activeContainer.innerHTML = '<div class="text-center py-6 text-slate-400 text-sm">กำลังจัดเตรียมพื้นที่ล่าสมบัติ...</div>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    let loadingAnim = playLegendaryLoading(); 
+
+    // 1. โหลดภารกิจจาก Firebase (ของเดิม)
+    try {
+        const qSnap = await db.collection('treasure_quests').get();
+        trs_quests = qSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) { 
+        console.error("Firebase Error: ", e); 
+    }
+
+    // 👇 2. ดึงข้อมูลกระเป๋าสมบัติจาก Supabase แทน Google Sheet
+    try {
+        const { data: piecesData } = await supabase1
+            .from('treasure_pieces')
+            .select('*')
+            .eq('student_id', String(trs_user.id));
+        
+        const { data: compData } = await supabase1
+            .from('student_treasures')
+            .select('*')
+            .eq('student_id', String(trs_user.id));
+
+        let myMap = {};
+        
+        if (piecesData) {
+            piecesData.forEach(p => {
+                if (!myMap[p.quest_id]) myMap[p.quest_id] = { quest_id: p.quest_id, collected_pieces: [], is_completed: false };
+                if (!myMap[p.quest_id].collected_pieces.includes(p.piece_num)) {
+                    myMap[p.quest_id].collected_pieces.push(p.piece_num);
+                }
+            });
+        }
+        
+        if (compData) {
+            compData.forEach(c => {
+                if (!myMap[c.quest_id]) myMap[c.quest_id] = { quest_id: c.quest_id, collected_pieces: [], is_completed: true };
+                myMap[c.quest_id].is_completed = true;
+            });
+        }
+        
+        trs_myTreasures = Object.values(myMap);
+    } catch(e) { 
+        console.error("Supabase Load Error: ", e); 
+        trs_myTreasures = []; 
+    }
+
+    await loadingAnim; 
+    closeLegendaryLoading();
+    trs_renderUI();
+}
+
+// ==========================================
+// 🌟 ฟังก์ชันสแกนสมบัติ (ใช้ Supabase 100%)
+// ==========================================
+let isProcessingQR = false; // ตัวแปรรักษาความปลอดภัย
+
 async function trs_onSuccess(decodedText, decodedResult) {
-    try { stopScanner(); } catch(e) {}
-    if (!decodedText.startsWith('TREASURE:')) { return trs_showAlert('ไม่ใช่ลายแทงสมบัติ', 'QR Code ไม่ใช่ลายแทงของระบบนี้', 'error'); }
-    
-    const parts = decodedText.split(':'); const questId = parts[1]; const pieceNum = parseInt(parts[2]);
-    const quest = trs_quests.find(q => q.id === questId);
-    if (!quest) { return trs_showAlert('ไม่พบภารกิจนี้ในระบบ', 'ภารกิจนี้อาจถูกลบไปแล้ว', 'error'); }
-
-    // เช็คซ้ำก่อนโชว์แอนิเมชัน จะได้ไม่เสียเวลาโหลด
-    let myData = trs_myTreasures.find(t => t.quest_id === questId);
-    if (myData && myData.is_completed) { closeCustomAlert(); return trs_showAlert('สำเร็จไปแล้ว!', 'คุณได้ครอบครองสมบัติชิ้นนี้ไปเรียบร้อยแล้ว 🏆', 'success'); }
-    if (myData && myData.collected_pieces.includes(pieceNum)) { closeCustomAlert(); return trs_showAlert('สแกนซ้ำ', `คุณเคยสแกนชิ้นส่วนที่ ${pieceNum} ไปแล้ว ลองหาชิ้นอื่นนะ!`, 'warning'); }
-
-    // 🌟 เรียกใช้หน้าจอโหลดสุดเทพ! (ระบบจะรอตรงนี้ 4 วินาทีเต็ม)
-    await playLegendaryLoading();
+    if (isProcessingQR) return; 
+    isProcessingQR = true;      
 
     try {
-        await fetch(TRS_GAS_URL, {
-    method: 'POST',
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action: 'add_piece', student_id: String(trs_user.id), quest_id: questId, piece_num: pieceNum })
-});
+        try { stopScanner(); } catch(e) {}
+        
+        if (!decodedText.startsWith('TREASURE:')) { 
+            return trs_showAlert('ไม่ใช่ลายแทงสมบัติ', 'QR Code ไม่ใช่ลายแทงของระบบนี้', 'error'); 
+        }
+        
+        const parts = decodedText.split(':'); const questId = parts[1]; const pieceNum = parseInt(parts[2]);
+        const quest = trs_quests.find(q => q.id === questId);
+        
+        if (!quest) { 
+            return trs_showAlert('ไม่พบภารกิจนี้ในระบบ', 'ภารกิจนี้อาจถูกลบไปแล้ว', 'error'); 
+        }
+
+        let myData = trs_myTreasures.find(t => t.quest_id === questId);
+        if (myData && myData.is_completed) { 
+            closeCustomAlert(); 
+            return trs_showAlert('สำเร็จไปแล้ว!', 'คุณได้ครอบครองสมบัติชิ้นนี้ไปเรียบร้อยแล้ว 🏆', 'success'); 
+        }
+        if (myData && myData.collected_pieces.includes(pieceNum)) { 
+            closeCustomAlert(); 
+            return trs_showAlert('สแกนซ้ำ', `คุณเคยสแกนชิ้นส่วนที่ ${pieceNum} ไปแล้ว ลองหาชิ้นอื่นนะ!`, 'warning'); 
+        }
+
+        await playLegendaryLoading();
+
+        // บันทึกชิ้นส่วนลง Supabase
+        const { data, error } = await supabase1
+            .from('treasure_pieces') 
+            .insert([
+                { 
+                    student_id: String(trs_user.id), 
+                    quest_id: questId, 
+                    piece_num: pieceNum 
+                }
+            ]);
+
+        if (error) throw error; 
 
         if (!myData) {
             trs_myTreasures.push({ quest_id: questId, collected_pieces: [pieceNum], is_completed: false });
@@ -542,10 +588,14 @@ async function trs_onSuccess(decodedText, decodedResult) {
         closeCustomAlert();
         trs_showFoundModal(quest, pieceNum);
         trs_renderUI();
+        
     } catch (e) { 
+        console.error("Supabase Scan Error: ", e);
         closeLegendaryLoading();
         closeCustomAlert();
-        trs_showAlert('เกิดข้อผิดพลาด', 'เชื่อมต่อฐานข้อมูลล้มเหลว กรุณาลองใหม่', 'error'); 
+        trs_showAlert('เกิดข้อผิดพลาดในการบันทึก', e.message || 'เชื่อมต่อฐานข้อมูลล้มเหลว', 'error'); 
+    } finally {
+        isProcessingQR = false; 
     }
 }
 
