@@ -944,34 +944,48 @@ window.claimGeoTreasure = async function() {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 
     try {
-        // 1. อัปเดตการเก็บใน Firebase
+        // 1. อัปเดตการเก็บใน Firebase (เพื่อลบกล่องออกจากแมพ Real-time ของผู้เล่นทุกคน)
         await db.collection('live_drops').doc(drop.id).update({
             claimed_by: firebase.firestore.FieldValue.arrayUnion(String(trs_user.id))
         });
 
-        // 2. ส่งข้อมูลไป Google Sheets (พร้อมแก้ CORS Error)
-        try {
-            await fetch(TRS_GAS_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify({ action: 'add_coins', student_id: String(trs_user.id), amount: drop.reward })
-            });
-        } catch(gasErr) {
-            console.log("บันทึกสำรองเงียบๆ:", gasErr);
+        // 🚀 2. จุดที่อัปเกรด: เปลี่ยนจาก GAS มาบันทึกลง Supabase แทน
+        let lat = null, lng = null;
+        if (typeof geoUserMarker !== 'undefined' && geoUserMarker) {
+            lat = geoUserMarker.getLatLng().lat;
+            lng = geoUserMarker.getLatLng().lng;
         }
 
-        // 3. ลบกล่องออกจากแผนที่
+        const { data, error } = await supabase1
+            .from('student_treasures')
+            .insert([
+                {
+                    student_id: String(trs_user.id),
+                    drop_id: drop.id,
+                    reward_amount: drop.reward,
+                    collected_lat: lat,
+                    collected_lng: lng
+                }
+            ]);
+
+        if (error) {
+            // ดักจับ Error Code 23505 (Unique Violation) คือเด็กพยายามเก็บกล่องเดิมซ้ำ
+            if (error.code === '23505') {
+                throw new Error("คุณเก็บสมบัติกล่องนี้ไปแล้ว!");
+            } else {
+                throw error;
+            }
+        }
+
+        // 3. ลบกล่องออกจากแผนที่บนจอของนักเรียนคนนี้
         geoMap.removeLayer(drop.marker);
         activeLiveDrops = activeLiveDrops.filter(d => d.id !== drop.id);
 
-        // 🌟 4. แสดง Popup แจ้งยอดเงินที่ได้รับจริง (Toast) และยิงพลุ
-        // เรียกใช้ฟังก์ชัน showToast ที่มีอยู่ในระบบหลัก
+        // 🌟 4. แสดง Popup แจ้งยอดเงินที่ได้รับจริง และยิงพลุ
         if (typeof showToast === 'function') {
             showToast(`🎉 ยินดีด้วย! คุณได้รับสมบัติจำนวน ${drop.reward} G`, 'success');
         }
 
-        // ยิงพลุกระดาษฉลอง (โทนสีทอง Amber ตามสไตล์ 2.5D ที่คุณครูชอบ)
         if (typeof confetti === 'function') {
             confetti({
                 particleCount: 150,
@@ -986,10 +1000,15 @@ window.claimGeoTreasure = async function() {
         if(geoUserMarker) checkProximity(geoUserMarker.getLatLng().lat, geoUserMarker.getLatLng().lng);
 
     } catch (e) {
+        console.error("❌ แจ้งเตือน Error การเก็บสมบัติ:", e);
         btn.disabled = false;
         btn.innerHTML = oldHtml;
         if (typeof lucide !== 'undefined') lucide.createIcons();
-        if (typeof showToast === 'function') showToast('เกิดข้อผิดพลาดในการเก็บสมบัติ', 'error');
+        
+        // แสดงข้อความ Error ออกหน้าจอจริงๆ ให้รู้ว่าเกิดอะไรขึ้น
+        if (typeof showToast === 'function') {
+            showToast(e.message || 'เกิดข้อผิดพลาดในการเก็บสมบัติ', 'error');
+        }
     }
 }
 
