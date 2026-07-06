@@ -639,16 +639,24 @@ window.combineTreasure = async function(questId, questTitle) {
         
         closeLegendaryLoading();
         
-        // โชว์หน้าต่างยินดีด้วย! 
-        document.getElementById('success-quest-name').textContent = questTitle;
+        // 🛡️ จุดแก้ไขความปลอดภัย: ดักจับ Null ตรวจสอบว่ามี Element อยู่จริงไหมก่อนใส่ข้อความ
+        const questNameEl = document.getElementById('success-quest-name');
+        if (questNameEl) {
+            questNameEl.textContent = questTitle;
+        }
+
+        // 🛡️ จุดแก้ไขความปลอดภัย: ตรวจสอบ Modal และ Box ก่อนสั่งแอนิเมชันเปิดใช้งาน
         const modal = document.getElementById('success-modal'); 
         const box = document.getElementById('success-box');
-        if(modal && box) {
+        if (modal && box) {
             modal.classList.remove('hidden'); 
             setTimeout(() => { 
                 modal.classList.remove('opacity-0'); 
                 box.classList.replace('scale-50', 'scale-100'); 
             }, 10);
+        } else {
+            // กรณีฉุกเฉินถ้าลืมใส่โครงสร้าง Modal ใน index.html ให้ใช้ระบบ Alert ของระบบแทน จอจะได้ไม่ขาว
+            trs_showAlert('รวมสมบัติสำเร็จ!', `คุณได้รับสมบัติ "${questTitle}" เรียบร้อยแล้วครับ 🏆`, 'success');
         }
 
         // โหลดข้อมูลกระดานทำเนียบใหม่ให้หน้าแรกอัปเดตทันที
@@ -663,25 +671,32 @@ window.combineTreasure = async function(questId, questTitle) {
     }
 };
 
-// ==========================================
-// 🌟 4. UI Alerts
-// ==========================================
 function trs_showFoundModal(quest, pieceNum) { 
-    document.getElementById('found-piece-num').textContent = pieceNum; 
-    document.getElementById('found-quest-title').textContent = quest.title; 
+    const numEl = document.getElementById('found-piece-num');
+    const titleEl = document.getElementById('found-quest-title');
+    const imgEl = document.getElementById('found-piece-img');
+    const modal = document.getElementById('piece-found-modal');
+    const box = document.getElementById('piece-found-box');
+
+    // 🛡️ ป้องกันบัคจอขาวเมื่อ HTML ไม่ครบ
+    if (!numEl || !titleEl || !imgEl || !modal || !box) {
+        console.warn("ไม่พบหน้าต่าง Modal UI ใน index.html");
+        if (typeof showToast === 'function') showToast("เจอสมบัติแล้ว! 🎉", "success");
+        return;
+    }
+
+    numEl.textContent = pieceNum; 
+    titleEl.textContent = quest.title; 
     let defaultImg = `https://ui-avatars.com/api/?name=${pieceNum}&background=fef3c7&color=d97706&size=512&font-size=0.5`; 
     let modalImgUrl = defaultImg;
-if (quest.piece_images && quest.piece_images[pieceNum-1]) {
-    let piece = quest.piece_images[pieceNum-1];
-    modalImgUrl = (typeof piece === 'object') ? (piece.url || defaultImg) : piece;
-}
-document.getElementById('found-piece-img').src = modalImgUrl;
-    const modal = document.getElementById('piece-found-modal'); 
-    const box = document.getElementById('piece-found-box'); 
-    if(modal && box) {
-        modal.classList.remove('hidden'); 
-        setTimeout(() => { modal.classList.remove('opacity-0'); box.classList.replace('scale-50', 'scale-100'); }, 10); 
+    if (quest.piece_images && quest.piece_images[pieceNum-1]) {
+        let piece = quest.piece_images[pieceNum-1];
+        modalImgUrl = (typeof piece === 'object') ? (piece.url || defaultImg) : piece;
     }
+    imgEl.src = modalImgUrl;
+    
+    modal.classList.remove('hidden'); 
+    setTimeout(() => { modal.classList.remove('opacity-0'); box.classList.replace('scale-50', 'scale-100'); }, 10); 
 }
 
 window.closePieceModal = function() { 
@@ -796,7 +811,7 @@ window.openGeoQuestMap = async function() {
 if ("geolocation" in navigator) {
     
     // ใช้ watchPosition เพื่อติดตามตำแหน่งตลอดเวลาที่เดิน
-    navigator.geolocation.watchPosition(
+    geoWatchId = navigator.geolocation.watchPosition(
         function(position) {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
