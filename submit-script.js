@@ -24,7 +24,7 @@ if (window.CUSTOM_GPS.enable) {
 // -----------------------------------------------------------------
 // 🚨 สำคัญ: นำ Web App URL ของคุณครูที่ได้ใหม่มาวางที่นี่
 const UPLOAD_GAS_URL =
-  "https://script.google.com/macros/s/AKfycbzTSa1DKU5hdxa3l_ghGMZVzkQj4h7z1LFCZ4CCFQ-CX9EBH4zNGGg8Po6Wlgz9uMSJ/exec";
+  "https://script.google.com/macros/s/AKfycbyupKJ-a5x2nInUiRZE7KpI8Dj7qhD8DpMgVkAvwVU7xdkJaEhmrfIBFHAIzgWrFMdY/exec";
 let currentSystemSettings = {}; // เพิ่มตัวแปร global สำหรับเก็บสถานะเปิด-ปิดระบบ
 
 // 🌟 ตัวแปร Global (ประกาศครั้งเดียว)
@@ -4379,6 +4379,24 @@ async function syncProfileWithGachaData() {
           submittedTitles.add(subData.title);
         }
       });
+
+
+      // ✨ แทรกโค้ดส่วนนี้เข้าไปเพื่อเช็คคะแนนที่ครูกรอกด้วยมือ ✨
+      if (data.scores) {
+        try {
+          const manualScores = JSON.parse(data.scores);
+          manualScores.forEach(scoreObj => {
+            // ถ้าครูกรอกคะแนนแล้ว (score ไม่เป็น null และไม่เป็นค่าว่าง) ให้นับว่าส่งงานแล้ว
+            if (scoreObj && scoreObj.name && scoreObj.score !== null && scoreObj.score !== "") {
+              submittedTitles.add(scoreObj.name);
+            }
+          });
+        } catch (e) {
+          console.error("Parse manual scores error:", e);
+        }
+      }
+      // ✨ สิ้นสุดส่วนที่แทรก ✨
+
       submittedCount = submittedTitles.size;
     } catch (err) {
       console.log("ยังไม่มีประวัติการส่งงาน");

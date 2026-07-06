@@ -396,7 +396,6 @@ function refreshCurrentTab() {
   lucide.createIcons();
 }
 
-// ==================== ส่วนที่ 1: โค้ดระบบส่งงานและ 360° Profile ====================
 function openStudentProfileById(studentId) {
   const student = allStudents.find(
     (s) => String(s.student_id) === String(studentId),
@@ -438,10 +437,19 @@ function openStudentProfileById(studentId) {
   try {
     if (course) expectedCats = JSON.parse(course.score_categories);
   } catch (e) {}
+  
+  // ✨ อัปเกรดการอ่านคะแนน ให้รองรับทั้งแบบ Array และ String
   let scs = [];
   try {
-    scs = JSON.parse(student.scores || "[]");
-  } catch (e) {}
+    if (typeof student.scores === 'string') {
+        scs = JSON.parse(student.scores || "[]");
+    } else if (Array.isArray(student.scores)) {
+        scs = student.scores;
+    }
+  } catch (e) {
+    console.log("Error parsing scores:", e);
+  }
+
   const subs = allSubmissions.filter(
     (s) => String(s.student_id) === String(studentId),
   );
@@ -452,30 +460,35 @@ function openStudentProfileById(studentId) {
       '<p class="text-slate-400 text-center py-8">ไม่มีข้อมูลช่องคะแนนในวิชานี้</p>';
   } else {
     expectedCats.forEach((cat) => {
-      const graded = scs.find((s) => s.name === cat.name);
+      // ✨ เพิ่ม .trim() ตัดช่องว่าง ป้องกันปัญหาพิมพ์เว้นวรรคผิด
+      const graded = scs.find((s) => s.name && s.name.trim() === cat.name.trim());
       const subItems = subs
-        .filter((s) => s.title === cat.name)
+        .filter((s) => s.title && s.title.trim() === cat.name.trim())
         .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
       const subItem = subItems.length > 0 ? subItems[0] : null;
 
       let statusUI = "";
       let scoreUI = `<span class="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">ยังไม่มีคะแนน</span>`;
 
-      if (graded && graded.score !== null && graded.score !== "") {
-        if (
-          subItem &&
-          graded.graded_at &&
-          new Date(subItem.submitted_at) > new Date(graded.graded_at)
-        ) {
+      // ✨ เงื่อนไขใหม่: ถ้ามีคะแนน ถือว่าตรวจแล้วเสมอ (ไม่สนว่าส่งไฟล์หรือไม่)
+      if (graded && graded.score !== null && graded.score !== "" && graded.score !== undefined) {
+        
+        // ถ้านักเรียนส่งงานมาใหม่ "หลัง" จากที่ครูเคยตรวจไปแล้ว ค่อยขึ้น "ส่งอัปเดตใหม่"
+        if (subItem && graded.graded_at && new Date(subItem.submitted_at) > new Date(graded.graded_at)) {
           statusUI = `<span class="bg-orange-100 text-orange-600 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider"><i data-lucide="refresh-cw" class="w-3 h-3 inline mr-1"></i>ส่งอัปเดตใหม่ (รอตรวจ)</span>`;
           scoreUI = `<span class="text-sm font-bold text-slate-700">${graded.score} <span class="text-xs text-slate-400 font-medium">/ ${cat.max}</span></span>`;
         } else {
+          // ถ้าไม่มีการส่งซ้ำ ก็ขึ้น "ตรวจแล้ว" เลย
           statusUI = `<span class="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider"><i data-lucide="check-circle" class="w-3 h-3 inline mr-1"></i>ตรวจแล้ว</span>`;
           scoreUI = `<span class="text-sm font-bold text-emerald-600">${graded.score} <span class="text-xs text-emerald-400 font-medium">/ ${cat.max}</span></span>`;
         }
-      } else if (subItem) {
+      } 
+      // กรณีที่ยังไม่มีคะแนน แต่มีการส่งงานผ่านเว็บ
+      else if (subItem) {
         statusUI = `<span class="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider"><i data-lucide="clock" class="w-3 h-3 inline mr-1"></i>รอตรวจ</span>`;
-      } else {
+      } 
+      // กรณีไม่มีทั้งคะแนนและงานที่ส่ง
+      else {
         statusUI = `<span class="bg-red-100 text-red-600 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider"><i data-lucide="alert-circle" class="w-3 h-3 inline mr-1"></i>ค้างส่ง</span>`;
       }
 
@@ -484,26 +497,17 @@ function openStudentProfileById(studentId) {
   }
   document.getElementById("sp-assignments").innerHTML = html;
 
-  // 🌟 วางคำสั่งผูกปุ่มพิมพ์ไว้ตรงนี้ (ก่อนสั่งเปิดหน้าต่าง)
+  // วางคำสั่งผูกปุ่มพิมพ์ไว้ตรงนี้ (ก่อนสั่งเปิดหน้าต่าง)
   const printBtn = document.getElementById("btn-print-portfolio");
   if (printBtn) printBtn.onclick = () => exportEPortfolio(studentId);
 
-  // บรรทัดที่มีอยู่เดิม (เอาไว้ล่างสุดของส่วนนี้)
   document.getElementById("student-profile-modal").classList.remove("hidden");
   setTimeout(
     () =>
       document.getElementById("student-profile-modal").classList.add("active"),
     10,
   );
-  lucide.createIcons();
-
-  document.getElementById("student-profile-modal").classList.remove("hidden");
-  setTimeout(
-    () =>
-      document.getElementById("student-profile-modal").classList.add("active"),
-    10,
-  );
-  lucide.createIcons();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function closeStudentProfile() {
