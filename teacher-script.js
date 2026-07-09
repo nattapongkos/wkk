@@ -1023,22 +1023,21 @@ async function doResetPin() {
   }
 }
 
-// 🟢 อัปเกรดตารางคะแนนแบบใหม่ สัดส่วนสวยงาม
+// 🟢 อัปเกรดตารางคะแนนแบบใหม่ สัดส่วนสวยงาม (แก้ไขกรองช่องที่ติ๊กถูก)
 function renderGradingTable() {
   const tbody = document.getElementById("grading-body");
   const thead = document.getElementById("grading-head");
   const empty = document.getElementById("grading-empty");
   if (!tbody || !thead) return;
 
-  // ✨ ส่วนที่แทรกเพิ่ม: ดักจับถ้ายังไม่ได้เลือกห้อง ✨
   if (currentClass === "none") {
-    thead.innerHTML = ""; // ล้างหัวตาราง
-    tbody.innerHTML = ""; // ล้างข้อมูลนักเรียน
+    thead.innerHTML = ""; 
+    tbody.innerHTML = ""; 
     if (empty) {
       empty.innerHTML = "กรุณาเลือกห้องเรียนเพื่อแสดงตารางคะแนน"; 
       empty.classList.remove("hidden");
     }
-    return; // หยุดการทำงาน ไม่ต้องดึงข้อมูลมาแสดง
+    return; 
   }
 
   const search = (
@@ -1055,12 +1054,14 @@ function renderGradingTable() {
 
   const cats = getCategories();
   
-  // 🟢 ปรับ UI หัวตารางสมุดคะแนนให้ดูง่าย แบ่งเป็นสัดส่วนชัดเจน
+  // 🌟 กรองเอาเฉพาะช่องคะแนนที่ติ๊กถูก (allow_submit เป็น true) เพื่อนำไปวาดตาราง
+  const displayCats = cats.filter(c => c.allow_submit !== false);
+  
   thead.innerHTML = `
     <tr class="bg-slate-100 border-b-2 border-slate-200 shadow-sm">
         <th class="px-4 py-4 font-bold uppercase text-[10px] tracking-widest text-slate-600 sticky left-0 z-20 bg-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">รหัสนักเรียน</th>
         <th class="px-4 py-4 font-bold uppercase text-[10px] tracking-widest text-slate-600 min-w-[150px] sticky left-[100px] z-20 bg-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">ชื่อ-สกุล</th>
-        ${cats.map((c, i) => `<th class="px-3 py-4 text-center text-[10px] uppercase leading-tight font-bold border-l border-slate-200 ${i%2===0 ? 'bg-indigo-50/50' : 'bg-white'} text-indigo-700 min-w-[80px]">${c.name}<br><span class="text-indigo-400 font-normal">เต็ม ${c.max}</span></th>`).join("")}
+        ${displayCats.map((c, i) => `<th class="px-3 py-4 text-center text-[10px] uppercase leading-tight font-bold border-l border-slate-200 ${i%2===0 ? 'bg-indigo-50/50' : 'bg-white'} text-indigo-700 min-w-[80px]">${c.name}<br><span class="text-indigo-400 font-normal">เต็ม ${c.max}</span></th>`).join("")}
         <th class="px-4 py-4 text-center font-bold uppercase text-[10px] tracking-widest bg-emerald-50 text-emerald-700 border-l-2 border-emerald-200 min-w-[80px]">รวมคะแนน</th>
         <th class="px-4 py-4 text-center font-bold uppercase text-[10px] tracking-widest bg-amber-50 text-amber-700 border-l border-amber-200 min-w-[80px]">เกรด</th>
     </tr>`;
@@ -1072,7 +1073,6 @@ function renderGradingTable() {
   }
   if (empty) empty.classList.add("hidden");
   
-  // 🟢 ปรับ UI ช่องกรอกข้อมูลให้ไฮไลท์สัดส่วนสีชัดเจน
   tbody.innerHTML = data
     .map((s) => {
       let scs = [];
@@ -1082,7 +1082,7 @@ function renderGradingTable() {
       return `<tr data-bid="${s.__backendId}" class="group hover:bg-indigo-50/30 transition-colors border-b border-slate-100">
         <td class="px-4 py-3 font-bold text-slate-500 tracking-tight sticky left-0 z-10 bg-white group-hover:bg-indigo-50/50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors">${s.student_id}</td>
         <td class="px-4 py-3 text-slate-800 font-bold whitespace-nowrap sticky left-[100px] z-10 bg-white group-hover:bg-indigo-50/50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors">${s.student_name}</td>
-        ${cats
+        ${displayCats
         .map((c, i) => {
           const f = scs.find((sc) => sc.name === c.name);
           const val = f && f.score !== null && f.score !== "" ? f.score : "";
@@ -1104,7 +1104,6 @@ function renderGradingTable() {
 async function saveAllGrades() {
   const btn = document.getElementById("save-all-btn");
   
-  // 🟢 เพิ่มการตรวจสอบว่ามีปุ่มอยู่จริงไหมก่อนสั่งปิดปุ่ม
   if (btn) {
     btn.disabled = true;
     btn.innerHTML = "Saving...";
@@ -1121,34 +1120,47 @@ async function saveAllGrades() {
     if (!student) return;
     let total = 0;
     const scores = [];
-    // 🟢 ก่อนลูป input ให้ดึงคะแนนเดิมมาเตรียมไว้เทียบ
     const oldScores = student.scores ? JSON.parse(student.scores) : [];
 
-    tr.querySelectorAll(".grading-input").forEach((inp) => {
-      const catName = inp.getAttribute("data-cat");
-      const catObj = cats.find((c) => c.name === catName);
-      
-      if (catObj && inp.value.trim() !== "") {
-        const v = Math.min(parseFloat(inp.value), catObj.max);
-        
-        // 🟢 หารายการคะแนนเก่าของวิชานี้
-        const oldScoreObj = oldScores.find(s => s.name === catObj.name);
-        
-        // 🟢 ถ้าคะแนนเท่าเดิมเป๊ะๆ ให้ใช้ timestamp เดิม! (ป้องกันการเสียโควต้า write ฟรีๆ)
-        let gradedTime = new Date().toISOString();
-        if (oldScoreObj && oldScoreObj.score === v) {
-            gradedTime = oldScoreObj.graded_at || gradedTime; 
-        }
+    // วนลูปตามโครงสร้างช่องคะแนนทั้งหมด
+    cats.forEach((catObj) => {
+      // ค้นหา Input Element ของช่องคะแนนนั้นๆ บนหน้าจอ
+      const inp = tr.querySelector(`.grading-input[data-cat="${catObj.name}"]`);
 
-        scores.push({
-          name: catObj.name,
-          max: catObj.max,
-          score: v,
-          graded_at: gradedTime, // 🟢 ใช้เวลาที่เช็คแล้ว
-        });
-        total += v;
+      if (inp) {
+        // 1. ถ้าช่องคะแนนนี้เปิดแสดงอยู่บนหน้าจอ ให้ดึงค่าจากช่องกรอกมาบันทึก
+        if (inp.value.trim() !== "") {
+          const v = Math.min(parseFloat(inp.value), catObj.max);
+          const oldScoreObj = oldScores.find(s => s.name === catObj.name);
+          
+          let gradedTime = new Date().toISOString();
+          if (oldScoreObj && oldScoreObj.score === v) {
+              gradedTime = oldScoreObj.graded_at || gradedTime; 
+          }
+
+          scores.push({
+            name: catObj.name,
+            max: catObj.max,
+            score: v,
+            graded_at: gradedTime, 
+          });
+          total += v;
+        }
+      } else {
+        // 2. ถ้าช่องคะแนนนี้ถูกซ่อนอยู่ (ไม่ได้ติ๊กถูก) ให้ดึงคะแนนเก่าที่มีอยู่ใน DB มาเซฟกลับเข้าไปด้วย เพื่อป้องกันคะแนนเดิมหาย
+        const oldScoreObj = oldScores.find(s => s.name === catObj.name);
+        if (oldScoreObj && oldScoreObj.score !== null && oldScoreObj.score !== "") {
+          scores.push({
+            name: catObj.name,
+            max: catObj.max,
+            score: oldScoreObj.score,
+            graded_at: oldScoreObj.graded_at || new Date().toISOString(),
+          });
+          total += oldScoreObj.score;
+        }
       }
     });
+
     const pct = totalMax > 0 ? (total / totalMax) * 100 : 0;
     const newScoresStr = JSON.stringify(scores);
     if (student.scores !== newScoresStr) {
@@ -1174,13 +1186,15 @@ async function saveAllGrades() {
     showToast("ไม่มีข้อมูลเปลี่ยนแปลง", "info");
   }
 
-  // 🟢 ตรวจสอบว่าปุ่มยังมีอยู่ไหมก่อนสั่งคืนค่าปุ่ม
   if (btn) {
     btn.disabled = false;
     btn.innerHTML = '<i data-lucide="check-circle-2" class="w-5 h-5"></i> บันทึกตารางคะแนน';
     lucide.createIcons();
   }
 }
+
+
+
 async function executeDeleteSubmission() {
   if (!itemToDeleteSub) return;
   const btn = document.getElementById("btn-confirm-delete-sub");
